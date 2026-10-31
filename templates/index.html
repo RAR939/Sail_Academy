@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#079fe0">
+  <title>Sail Academy — Вход в клуб</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <main class="scene">
+    <div class="scene-shade" aria-hidden="true"></div>
+    <header class="masthead">
+      <p class="brand" id="brand-title">Sail Academy</p>
+      <p class="brand-subtitle">ШКОЛА ПАРУСНОГО СПОРТА</p>
+    </header>
+
+    <section class="auth-card" aria-labelledby="heading">
+      <div class="eyebrow"><span></span> ТВОЁ ПРИКЛЮЧЕНИЕ НАЧИНАЕТСЯ ЗДЕСЬ <span></span></div>
+      <h1 id="heading">Добро пожаловать на борт</h1>
+      <p class="subtitle" id="subtitle">Войди в клуб, чтобы продолжить обучение.</p>
+
+      <div class="tabs" role="tablist" aria-label="Авторизация">
+        <button class="tab active" id="login-tab" type="button" role="tab" aria-selected="true">☸ <span>Вход</span></button>
+        <button class="tab" id="register-tab" type="button" role="tab" aria-selected="false">⚓ <span>Регистрация</span></button>
+      </div>
+
+      <form id="auth-form">
+        <label class="sr-only" for="username">Имя пользователя</label>
+        <div class="input-wrap">
+          <span class="field-icon" aria-hidden="true">♟</span>
+          <input id="username" name="username" type="text" minlength="3" maxlength="24"
+                 pattern="[A-Za-zА-Яа-яЁё0-9_-]{3,24}" autocomplete="username"
+                 placeholder="Имя пользователя" required>
+        </div>
+
+        <label class="sr-only" for="password">Пароль</label>
+        <div class="input-wrap">
+          <span class="field-icon lock" aria-hidden="true">▣</span>
+          <input id="password" name="password" type="password" minlength="10" maxlength="128"
+                 autocomplete="current-password" placeholder="Пароль" required>
+          <button class="toggle-password" id="toggle-password" type="button" aria-label="Показать пароль" title="Показать пароль">◉</button>
+        </div>
+
+        <p id="message" class="message" role="status" aria-live="polite"></p>
+        <button id="submit-button" class="primary-button" type="submit"><span aria-hidden="true">↪</span> Войти в игру</button>
+      </form>
+
+      <div class="card-footer"><span class="status-dot"></span><span id="server-label">Локальный сервер Sail Academy</span></div>
+      <div id="signed-in" class="signed-in" hidden>
+        <p id="signed-in-text"></p>
+        <button id="logout-button" class="secondary-button" type="button">Выйти из аккаунта</button>
+      </div>
+    </section>
+
+    <footer class="scene-footer"><span></span> УЧИСЬ · УПРАВЛЯЙ · ПОКОРЯЙ ВОЛНЫ <span></span></footer>
+    <div class="sr-only" aria-hidden="true">Иллюстрация моря, паруса, солнца, маяка и песчаного побережья.</div>
+  </main>
+</body>
+</html>
