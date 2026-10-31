@@ -12,6 +12,10 @@ import { CameraRig } from "../gameplay/CameraRig";
 import { InteractionSystem } from "../gameplay/InteractionSystem";
 import { Player } from "../gameplay/Player";
 import { InputController } from "../input/InputController";
+import {
+  AssetLoader,
+  type SpawnedAsset,
+} from "../rendering/AssetLoader";
 import { DialogueOverlay } from "../ui/DialogueOverlay";
 
 export class HubScene {
@@ -22,10 +26,23 @@ export class HubScene {
   private readonly dialogue: DialogueOverlay;
   private readonly interactionHint: HTMLDivElement;
 
+  private readonly assetLoader: AssetLoader;
+  private readonly environmentRoot: TransformNode;
+  private readonly spawnedAssets: SpawnedAsset[] = [];
+
+  private disposed = false;
+
   public constructor(
     private readonly scene: Scene,
     canvas: HTMLCanvasElement,
   ) {
+    this.environmentRoot = new TransformNode(
+      "hub-environment-root",
+      scene,
+    );
+
+    this.assetLoader = new AssetLoader(scene);
+
     this.createEnvironment();
 
     this.player = new Player(scene, {
@@ -52,6 +69,10 @@ export class HubScene {
     });
 
     this.createTestNpc();
+
+    void this.loadHubAssets().catch((error) => {
+      console.error("Не удалось загрузить ассеты хаба:", error);
+    });
   }
 
   public update(deltaSeconds: number): void {
@@ -66,9 +87,19 @@ export class HubScene {
   }
 
   public dispose(): void {
+    this.disposed = true;
+
     this.interactionHint.remove();
     this.dialogue.dispose();
 
+    for (const asset of this.spawnedAssets) {
+      asset.dispose();
+    }
+
+    this.spawnedAssets.length = 0;
+
+    this.environmentRoot.dispose();
+    this.assetLoader.dispose();
     this.interactions.dispose();
     this.input.dispose();
     this.cameraRig.dispose();
@@ -121,6 +152,136 @@ export class HubScene {
     this.createInclinedTestWalls();
   }
 
+  private async loadHubAssets(): Promise<void> {
+    const urls = [
+      "/assets/glb/environment/tree_palm_tall.glb",
+      "/assets/glb/environment/tree_palm_bend.glb",
+      "/assets/glb/environment/rock_large_a.glb",
+      "/assets/glb/environment/rock_small_a.glb",
+      "/assets/glb/environment/bush_large.glb",
+      "/assets/glb/props/canoe.glb",
+      "/assets/glb/props/sign.glb",
+      "/assets/glb/props/crate.glb",
+      "/assets/glb/props/flag.glb",
+    ];
+
+    await this.assetLoader.preload(urls);
+
+    await Promise.all([
+      this.spawnStaticAsset(
+        "/assets/glb/environment/tree_palm_tall.glb",
+        "palm-tall-01",
+        new Vector3(-25, 0, -16),
+        new Vector3(1.5, 1.5, 1.5),
+      ),
+      this.spawnStaticAsset(
+        "/assets/glb/environment/tree_palm_tall.glb",
+        "palm-tall-02",
+        new Vector3(19, 0, -20),
+        new Vector3(1.35, 1.35, 1.35),
+      ),
+      this.spawnStaticAsset(
+        "/assets/glb/environment/tree_palm_bend.glb",
+        "palm-bend-01",
+        new Vector3(-21, 0, 8),
+        new Vector3(1.2, 1.2, 1.2),
+        Math.PI / 2,
+      ),
+      this.spawnStaticAsset(
+        "/assets/glb/environment/rock_large_a.glb",
+        "rock-large-01",
+        new Vector3(-9, 0, -13),
+        new Vector3(1.5, 1.5, 1.5),
+        -0.4,
+      ),
+      this.spawnStaticAsset(
+        "/assets/glb/environment/rock_small_a.glb",
+        "rock-small-01",
+        new Vector3(-7, 0, -11),
+        new Vector3(0.9, 0.9, 0.9),
+        0.7,
+      ),
+      this.spawnStaticAsset(
+        "/assets/glb/environment/bush_large.glb",
+        "bush-01",
+        new Vector3(15, 0, 4),
+        new Vector3(1.25, 1.25, 1.25),
+      ),
+      this.spawnStaticAsset(
+        "/assets/glb/environment/bush_large.glb",
+        "bush-02",
+        new Vector3(18, 0, 7),
+        new Vector3(0.9, 0.9, 0.9),
+        1.4,
+      ),
+      this.spawnStaticAsset(
+        "/assets/glb/props/canoe.glb",
+        "canoe-01",
+        new Vector3(-10, 0, -7),
+        new Vector3(1.15, 1.15, 1.15),
+        Math.PI / 2,
+      ),
+      this.spawnStaticAsset(
+        "/assets/glb/props/sign.glb",
+        "club-sign-01",
+        new Vector3(-5, 0, 8),
+        new Vector3(1.2, 1.2, 1.2),
+      ),
+      this.spawnStaticAsset(
+        "/assets/glb/props/crate.glb",
+        "crate-01",
+        new Vector3(5, 0, 7),
+        Vector3.One(),
+        0.2,
+      ),
+      this.spawnStaticAsset(
+        "/assets/glb/props/crate.glb",
+        "crate-02",
+        new Vector3(6.2, 0, 7.3),
+        new Vector3(0.85, 0.85, 0.85),
+        -0.5,
+      ),
+      this.spawnStaticAsset(
+        "/assets/glb/props/flag.glb",
+        "club-flag-01",
+        new Vector3(-2, 0, 8),
+        new Vector3(1.4, 1.4, 1.4),
+      ),
+    ]);
+  }
+
+  private async spawnStaticAsset(
+    url: string,
+    name: string,
+    position: Vector3,
+    scaling: Vector3,
+    rotationY = 0,
+  ): Promise<void> {
+    const asset = await this.assetLoader.spawn(url, {
+      name,
+      parent: this.environmentRoot,
+      position,
+      rotation: new Vector3(0, rotationY, 0),
+      scaling,
+      checkCollisions: false,
+    });
+
+    if (this.disposed) {
+      asset.dispose();
+      return;
+    }
+
+    this.spawnedAssets.push(asset);
+
+    for (const root of asset.roots) {
+      root.freezeWorldMatrix();
+
+      for (const mesh of root.getChildMeshes()) {
+        mesh.freezeWorldMatrix();
+      }
+    }
+  }
+
   private createInclinedTestWalls(): void {
     this.createInclinedWall(
       "wall-89-degrees",
@@ -161,7 +322,6 @@ export class HubScene {
       this.scene,
     );
 
-    // Центр располагается так, чтобы нижний край касался земли.
     const verticalHalfSize =
       (Math.abs(Math.sin(angleRadians)) * depth) / 2 +
       (Math.abs(Math.cos(angleRadians)) * height) / 2;
