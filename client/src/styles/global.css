@@ -139,3 +139,93 @@ body {
     min-height: 96px;
   }
 }
+.network-login-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(8 18 27 / 72%);
+  font-family: Arial, sans-serif;
+}
+
+.network-login-overlay[hidden] {
+  display: none;
+}
+
+.network-login-form {
+  box-sizing: border-box;
+  display: grid;
+  gap: 14px;
+  width: min(420px, 100%);
+  padding: 30px;
+  border: 1px solid rgb(155 205 220 / 45%);
+  border-radius: 12px;
+  background: #122333;
+  box-shadow: 0 18px 60px rgb(0 0 0 / 45%);
+  color: #edf5f6;
+}
+
+.network-login-form h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.network-login-subtitle {
+  margin: -8px 0 8px;
+  color: #a9c1ca;
+}
+
+.network-login-field {
+  display: grid;
+  gap: 6px;
+  color: #c4d7de;
+  font-size: 13px;
+}
+
+.network-login-field input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #496575;
+  border-radius: 6px;
+  background: #0b1721;
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+}
+
+.network-login-field input:focus {
+  border-color: #8bc7dc;
+  outline: 2px solid rgb(139 199 220 / 18%);
+}
+
+.network-login-submit {
+  margin-top: 4px;
+  padding: 12px;
+  border: 0;
+  border-radius: 6px;
+  background: #78b8cf;
+  color: #10212b;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.network-login-submit:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.network-login-status {
+  min-height: 18px;
+  margin: 0;
+  color: #b7dce8;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.network-login-status.is-error {
+  color: #ff9f9f;
+}

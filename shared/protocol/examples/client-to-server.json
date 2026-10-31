@@ -1,0 +1,34 @@
+[
+  {
+    "t": "auth",
+    "token": "<JWT_ACCESS_TOKEN>"
+  },
+  {
+    "t": "ping"
+  },
+  {
+    "t": "move",
+    "x": 1.5,
+    "y": 0.0,
+    "z": -2.0,
+    "ry": 1.2,
+    "anim": "walk"
+  },
+  {
+    "t": "boat",
+    "heading": 0.8,
+    "sailAngle": -0.35
+  },
+  {
+    "t": "create_race"
+  },
+  {
+    "t": "enter_location",
+    "locationId": "training_area"
+  },
+  {
+    "t": "enter_location",
+    "locationId": "race_track",
+    "roomId": "race_a1b2c3d4"
+  }
+]

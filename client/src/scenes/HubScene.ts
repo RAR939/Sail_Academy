@@ -17,6 +17,14 @@ import {
   type SpawnedAsset,
 } from "../rendering/AssetLoader";
 import { DialogueOverlay } from "../ui/DialogueOverlay";
+import { NetworkClient } from "../network/NetworkClient";
+import type {
+  LocationChangedMessage,
+  PlayerStateMessage,
+  PlayersMessage,
+  WelcomeMessage,
+} from "../network/NetworkMessages";
+import { RemotePlayer } from "../network/RemotePlayer";
 
 export class HubScene {
   private readonly player: Player;
@@ -29,12 +37,17 @@ export class HubScene {
   private readonly assetLoader: AssetLoader;
   private readonly environmentRoot: TransformNode;
   private readonly spawnedAssets: SpawnedAsset[] = [];
+  private readonly remotePlayers = new Map<number, RemotePlayer>();
+  private readonly networkUnsubscribers: Array<() => void> = [];
+  private localUserId: number | null = null;
+  private networkSendAccumulator = 0;
 
   private disposed = false;
 
   public constructor(
     private readonly scene: Scene,
     canvas: HTMLCanvasElement,
+    private readonly network: NetworkClient,
   ) {
     this.environmentRoot = new TransformNode(
       "hub-environment-root",
@@ -56,6 +69,15 @@ export class HubScene {
 
     this.input = new InputController();
     this.interactions = new InteractionSystem(scene);
+
+    this.networkUnsubscribers.push(
+      this.network.on("welcome", this.handleWelcome),
+      this.network.on("players", this.handlePlayers),
+      this.network.on("location_changed", this.handleLocationChanged),
+      this.network.on("error", (message) => {
+        console.warn("[Sail Academy server]", message.message);
+      }),
+    );
     this.dialogue = new DialogueOverlay();
     this.interactionHint = this.createInteractionHint();
 
@@ -84,6 +106,13 @@ export class HubScene {
     this.player.update(deltaSeconds);
     this.cameraRig.update(deltaSeconds, isPlayerMoving);
     this.interactions.update(this.player);
+
+    this.updateNetwork(deltaSeconds);
+
+    const now = performance.now();
+    for (const remotePlayer of this.remotePlayers.values()) {
+      remotePlayer.update(now);
+    }
   }
 
   public dispose(): void {
@@ -91,6 +120,16 @@ export class HubScene {
 
     this.interactionHint.remove();
     this.dialogue.dispose();
+
+    for (const unsubscribe of this.networkUnsubscribers) {
+      unsubscribe();
+    }
+    this.networkUnsubscribers.length = 0;
+
+    for (const remotePlayer of this.remotePlayers.values()) {
+      remotePlayer.dispose();
+    }
+    this.remotePlayers.clear();
 
     for (const asset of this.spawnedAssets) {
       asset.dispose();
@@ -104,6 +143,86 @@ export class HubScene {
     this.input.dispose();
     this.cameraRig.dispose();
     this.player.dispose();
+  }
+
+
+  private readonly handleWelcome = (message: WelcomeMessage): void => {
+    this.localUserId = message.user_id;
+    this.applyPlayerSnapshot(message.players);
+  };
+
+  private readonly handlePlayers = (message: PlayersMessage): void => {
+    this.applyPlayerSnapshot(message.delta);
+  };
+
+  private readonly handleLocationChanged = (
+    message: LocationChangedMessage,
+  ): void => {
+    for (const remotePlayer of this.remotePlayers.values()) {
+      remotePlayer.dispose();
+    }
+    this.remotePlayers.clear();
+    this.applyPlayerSnapshot(message.players);
+  };
+
+  private applyPlayerSnapshot(players: PlayerStateMessage[]): void {
+    const presentIds = new Set<number>();
+
+    for (const state of players) {
+      if (state.id === this.localUserId) {
+        continue;
+      }
+
+      presentIds.add(state.id);
+
+      let remotePlayer = this.remotePlayers.get(state.id);
+      if (!remotePlayer) {
+        remotePlayer = new RemotePlayer(this.scene, state);
+        this.remotePlayers.set(state.id, remotePlayer);
+      } else {
+        remotePlayer.pushSnapshot(state);
+      }
+    }
+
+    // The current backend sends a complete room snapshot in `players.delta`,
+    // so missing IDs mean that those players have left this room.
+    for (const [userId, remotePlayer] of this.remotePlayers) {
+      if (!presentIds.has(userId)) {
+        remotePlayer.dispose();
+        this.remotePlayers.delete(userId);
+      }
+    }
+  }
+
+  private updateNetwork(deltaSeconds: number): void {
+    if (!this.network.isConnected) {
+      return;
+    }
+
+    this.networkSendAccumulator += deltaSeconds;
+    const sendInterval = 1 / 15;
+
+    if (this.networkSendAccumulator < sendInterval) {
+      return;
+    }
+
+    this.networkSendAccumulator %= sendInterval;
+
+    const snapshot = this.player.getSnapshot();
+
+    try {
+      this.network.sendMovement({
+        x: snapshot.x,
+        // The local capsule origin is at y=1.1; server coordinates use the
+        // ground-level origin (y=0), so convert between the two here.
+        y: snapshot.y - 1.1,
+        z: snapshot.z,
+        ry: snapshot.yaw,
+        anim: snapshot.animation,
+      });
+    } catch (error) {
+      console.warn("[NetworkClient] Не удалось отправить движение:", error);
+    }
   }
 
   private createEnvironment(): void {
