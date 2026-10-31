@@ -1,0 +1,76 @@
+[
+  {
+    "t": "welcome",
+    "user_id": 12,
+    "username": "sailor",
+    "room": "hub",
+    "players": [
+      {
+        "id": 12,
+        "username": "sailor",
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0,
+        "ry": 0.0,
+        "anim": "idle"
+      }
+    ]
+  },
+  {
+    "t": "players",
+    "delta": [
+      {
+        "id": 12,
+        "username": "sailor",
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0,
+        "ry": 0.0,
+        "anim": "idle",
+        "boat": {
+          "ownerId": 12,
+          "pos": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "heading": 0.8,
+          "sailAngle": -0.35
+        }
+      }
+    ]
+  },
+  {
+    "t": "wind",
+    "speed": 4.2,
+    "direction": 1.1
+  },
+  {
+    "t": "pong"
+  },
+  {
+    "t": "error",
+    "message": "Room not found"
+  },
+  {
+    "t": "location_changed",
+    "roomId": "training_training_area",
+    "roomType": "training",
+    "locationId": "training_area",
+    "players": [
+      {
+        "id": 12,
+        "username": "sailor",
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0,
+        "ry": 0.0,
+        "anim": "idle"
+      }
+    ]
+  },
+  {
+    "t": "race_created",
+    "roomId": "race_a1b2c3d4"
+  }
+]

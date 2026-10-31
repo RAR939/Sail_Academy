@@ -1,0 +1,374 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sail-academy.local/schemas/websocket.schema.json",
+  "title": "Sail Academy WebSocket protocol (implemented contract)",
+  "description": "Describes the WebSocket messages currently implemented by server/app/websocket/router.py and server/app/game/game_loop.py. The discriminator is `t`. This schema documents current behavior; it does not introduce unimplemented message types.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/clientMessage"
+    },
+    {
+      "$ref": "#/$defs/serverMessage"
+    }
+  ],
+  "$defs": {
+    "finiteNumber": {
+      "type": "number"
+    },
+    "player": {
+      "type": "object",
+      "required": [
+        "id",
+        "username",
+        "x",
+        "y",
+        "z",
+        "ry",
+        "anim"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "username": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "z": {
+          "type": "number"
+        },
+        "ry": {
+          "type": "number"
+        },
+        "anim": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "boat": {
+          "$ref": "#/$defs/boat"
+        }
+      },
+      "additionalProperties": false
+    },
+    "boat": {
+      "type": "object",
+      "required": [
+        "ownerId",
+        "pos",
+        "heading",
+        "sailAngle"
+      ],
+      "properties": {
+        "ownerId": {
+          "type": "integer"
+        },
+        "pos": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "heading": {
+          "type": "number"
+        },
+        "sailAngle": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "clientMessage": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "t",
+            "token"
+          ],
+          "properties": {
+            "t": {
+              "const": "auth"
+            },
+            "token": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "t"
+          ],
+          "properties": {
+            "t": {
+              "const": "ping"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "t",
+            "x",
+            "y",
+            "z",
+            "ry"
+          ],
+          "properties": {
+            "t": {
+              "const": "move"
+            },
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "z": {
+              "type": "number"
+            },
+            "ry": {
+              "type": "number"
+            },
+            "anim": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 24
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "t",
+            "heading",
+            "sailAngle"
+          ],
+          "properties": {
+            "t": {
+              "const": "boat"
+            },
+            "heading": {
+              "type": "number"
+            },
+            "sailAngle": {
+              "type": "number",
+              "minimum": -3.141592653589793,
+              "maximum": 3.141592653589793
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "t"
+          ],
+          "properties": {
+            "t": {
+              "const": "create_race"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "t",
+            "locationId"
+          ],
+          "properties": {
+            "t": {
+              "const": "enter_location"
+            },
+            "locationId": {
+              "enum": [
+                "club",
+                "training_area",
+                "race_track"
+              ]
+            },
+            "roomId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "serverMessage": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "t",
+            "user_id",
+            "username",
+            "room",
+            "players"
+          ],
+          "properties": {
+            "t": {
+              "const": "welcome"
+            },
+            "user_id": {
+              "type": "integer"
+            },
+            "username": {
+              "type": "string"
+            },
+            "room": {
+              "type": "string"
+            },
+            "players": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/player"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "t",
+            "delta"
+          ],
+          "properties": {
+            "t": {
+              "const": "players"
+            },
+            "delta": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/player"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "t",
+            "speed",
+            "direction"
+          ],
+          "properties": {
+            "t": {
+              "const": "wind"
+            },
+            "speed": {
+              "type": "number"
+            },
+            "direction": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "t"
+          ],
+          "properties": {
+            "t": {
+              "const": "pong"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "t",
+            "message"
+          ],
+          "properties": {
+            "t": {
+              "const": "error"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "t",
+            "roomId",
+            "roomType",
+            "locationId",
+            "players"
+          ],
+          "properties": {
+            "t": {
+              "const": "location_changed"
+            },
+            "roomId": {
+              "type": "string"
+            },
+            "roomType": {
+              "enum": [
+                "hub",
+                "training",
+                "race"
+              ]
+            },
+            "locationId": {
+              "type": "string"
+            },
+            "players": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/player"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "t",
+            "roomId"
+          ],
+          "properties": {
+            "t": {
+              "const": "race_created"
+            },
+            "roomId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}
