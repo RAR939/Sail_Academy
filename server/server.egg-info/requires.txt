@@ -1,0 +1,10 @@
+aiosqlite>=0.22
+alembic>=1.20
+fastapi<1.0,>=0.115
+pwdlib[argon2]>=0.3.1
+pydantic-settings<3.0,>=2.7
+pyjwt>=2.15.1
+python-dotenv>=1.2.4
+python-multipart>=0.0.32
+sqlalchemy[asyncio]>=2.0
+uvicorn[standard]<1.0,>=0.34
