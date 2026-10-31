@@ -1,0 +1,12 @@
+
+# Sail Academy AI
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.pyc
+*.sqlite3
+*.db
+*.bak
+.pytest_cache/
