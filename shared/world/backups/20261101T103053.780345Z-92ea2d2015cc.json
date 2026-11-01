@@ -1,0 +1,1247 @@
+{
+  "version": 1,
+  "player": {
+    "walkSpeed": 3.3,
+    "runSpeed": 4,
+    "acceleration": 22,
+    "braking": 85,
+    "gravity": -24,
+    "turnSpeed": 14
+  },
+  "camera": {
+    "distance": 5.2,
+    "minDistance": 2.6,
+    "maxDistance": 8,
+    "height": 0.55,
+    "beta": 1.18,
+    "followSpeed": 2.2,
+    "manualDelay": 1.25
+  },
+  "environment": {
+    "sky": "#a8d6e8",
+    "fogStart": 100,
+    "fogEnd": 250,
+    "lightIntensity": 1.15,
+    "sea": {
+      "width": 420,
+      "height": 350,
+      "position": [
+        0,
+        -0.35,
+        -140
+      ]
+    },
+    "materials": {
+      "warm-sand": "#d8c293",
+      "dune-grass": "#83916c",
+      "pier-wood": "#96714e",
+      "ivory-walls": "#efe7d6",
+      "club-navy": "#254a5d",
+      "roof": "#b7624c",
+      "metal": "#b5c6c9",
+      "lifejacket": "#f39035",
+      "sea": "#3e9ea8",
+      "path": "#e8d8b4",
+      "foam": "#c4e8dc"
+    }
+  },
+  "boxes": [
+    {
+      "name": "beach",
+      "size": [
+        94,
+        1,
+        64
+      ],
+      "position": [
+        0,
+        -0.5,
+        19
+      ],
+      "material": "warm-sand",
+      "collision": true,
+      "visible": true
+    },
+    {
+      "name": "back-dunes",
+      "size": [
+        94,
+        0.2,
+        13
+      ],
+      "position": [
+        0,
+        0.02,
+        43
+      ],
+      "material": "dune-grass",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "west-boundary",
+      "size": [
+        1,
+        8,
+        65
+      ],
+      "position": [
+        -46,
+        2,
+        19
+      ],
+      "material": "warm-sand",
+      "collision": true,
+      "visible": false
+    },
+    {
+      "name": "east-boundary",
+      "size": [
+        1,
+        8,
+        65
+      ],
+      "position": [
+        46,
+        2,
+        19
+      ],
+      "material": "warm-sand",
+      "collision": true,
+      "visible": false
+    },
+    {
+      "name": "north-boundary",
+      "size": [
+        94,
+        8,
+        1
+      ],
+      "position": [
+        0,
+        2,
+        50
+      ],
+      "material": "warm-sand",
+      "collision": true,
+      "visible": false
+    },
+    {
+      "name": "shore-left-boundary",
+      "size": [
+        30,
+        8,
+        1
+      ],
+      "position": [
+        -31,
+        2,
+        -13
+      ],
+      "material": "warm-sand",
+      "collision": true,
+      "visible": false
+    },
+    {
+      "name": "shore-right-boundary",
+      "size": [
+        59,
+        8,
+        1
+      ],
+      "position": [
+        17.5,
+        2,
+        -13
+      ],
+      "material": "warm-sand",
+      "collision": true,
+      "visible": false
+    },
+    {
+      "name": "pier-west-boundary",
+      "size": [
+        0.2,
+        4,
+        19
+      ],
+      "position": [
+        -16.2,
+        1,
+        -21
+      ],
+      "material": "warm-sand",
+      "collision": true,
+      "visible": false
+    },
+    {
+      "name": "pier-east-boundary",
+      "size": [
+        0.2,
+        4,
+        19
+      ],
+      "position": [
+        -11.8,
+        1,
+        -21
+      ],
+      "material": "warm-sand",
+      "collision": true,
+      "visible": false
+    },
+    {
+      "name": "pier-end-boundary",
+      "size": [
+        4.5,
+        4,
+        0.2
+      ],
+      "position": [
+        -14,
+        1,
+        -30
+      ],
+      "material": "warm-sand",
+      "collision": true,
+      "visible": false
+    },
+    {
+      "name": "club-path",
+      "size": [
+        6,
+        0.025,
+        32
+      ],
+      "position": [
+        0,
+        0.02,
+        10
+      ],
+      "material": "path",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "cross-path",
+      "size": [
+        38,
+        0.025,
+        4
+      ],
+      "position": [
+        0,
+        0.03,
+        5
+      ],
+      "material": "path",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "club-house",
+      "size": [
+        22,
+        5,
+        10
+      ],
+      "position": [
+        0,
+        2.5,
+        25
+      ],
+      "material": "ivory-walls",
+      "collision": true,
+      "visible": true
+    },
+    {
+      "name": "club-roof",
+      "size": [
+        24,
+        0.55,
+        12
+      ],
+      "position": [
+        0,
+        5.25,
+        25
+      ],
+      "material": "roof",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "club-porch",
+      "size": [
+        24,
+        0.15,
+        4
+      ],
+      "position": [
+        0,
+        0.075,
+        18
+      ],
+      "material": "pier-wood",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "club-door",
+      "size": [
+        2,
+        3.5,
+        0.1
+      ],
+      "position": [
+        0,
+        1.75,
+        19.94
+      ],
+      "material": "club-navy",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "club-window--7",
+      "size": [
+        3.6,
+        2,
+        0.12
+      ],
+      "position": [
+        -7,
+        2.8,
+        19.9
+      ],
+      "material": "club-navy",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "club-window-7",
+      "size": [
+        3.6,
+        2,
+        0.12
+      ],
+      "position": [
+        7,
+        2.8,
+        19.9
+      ],
+      "material": "club-navy",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "class-deck",
+      "size": [
+        12,
+        0.12,
+        9
+      ],
+      "position": [
+        14,
+        0.06,
+        13
+      ],
+      "material": "pier-wood",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "class-canopy",
+      "size": [
+        13,
+        0.25,
+        10
+      ],
+      "position": [
+        14,
+        4,
+        13
+      ],
+      "material": "ivory-walls",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "canopy-post",
+      "size": [
+        0.15,
+        4,
+        0.15
+      ],
+      "position": [
+        8,
+        2,
+        9
+      ],
+      "material": "club-navy",
+      "collision": true,
+      "visible": true
+    },
+    {
+      "name": "canopy-post",
+      "size": [
+        0.15,
+        4,
+        0.15
+      ],
+      "position": [
+        8,
+        2,
+        17
+      ],
+      "material": "club-navy",
+      "collision": true,
+      "visible": true
+    },
+    {
+      "name": "canopy-post",
+      "size": [
+        0.15,
+        4,
+        0.15
+      ],
+      "position": [
+        20,
+        2,
+        9
+      ],
+      "material": "club-navy",
+      "collision": true,
+      "visible": true
+    },
+    {
+      "name": "canopy-post",
+      "size": [
+        0.15,
+        4,
+        0.15
+      ],
+      "position": [
+        20,
+        2,
+        17
+      ],
+      "material": "club-navy",
+      "collision": true,
+      "visible": true
+    },
+    {
+      "name": "teaching-board",
+      "size": [
+        5,
+        2.1,
+        0.2
+      ],
+      "position": [
+        14,
+        2.25,
+        16
+      ],
+      "material": "club-navy",
+      "collision": true,
+      "visible": true
+    },
+    {
+      "name": "equipment-shed",
+      "size": [
+        9,
+        3.6,
+        6
+      ],
+      "position": [
+        23,
+        1.8,
+        3
+      ],
+      "material": "club-navy",
+      "collision": true,
+      "visible": true
+    },
+    {
+      "name": "equipment-roof",
+      "size": [
+        10,
+        0.3,
+        7
+      ],
+      "position": [
+        23,
+        3.7,
+        3
+      ],
+      "material": "roof",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "vest-rack",
+      "size": [
+        3,
+        0.2,
+        0.5
+      ],
+      "position": [
+        15,
+        2,
+        5
+      ],
+      "material": "pier-wood",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "rack-left",
+      "size": [
+        0.12,
+        2,
+        0.12
+      ],
+      "position": [
+        13.6,
+        1,
+        5
+      ],
+      "material": "pier-wood",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "rack-right",
+      "size": [
+        0.12,
+        2,
+        0.12
+      ],
+      "position": [
+        16.4,
+        1,
+        5
+      ],
+      "material": "pier-wood",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "orange-vest-left",
+      "size": [
+        0.22,
+        0.85,
+        0.25
+      ],
+      "position": [
+        14.049999999999999,
+        1.45,
+        5
+      ],
+      "material": "lifejacket",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "orange-vest-right",
+      "size": [
+        0.22,
+        0.85,
+        0.25
+      ],
+      "position": [
+        14.35,
+        1.45,
+        5
+      ],
+      "material": "lifejacket",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "orange-vest-left",
+      "size": [
+        0.22,
+        0.85,
+        0.25
+      ],
+      "position": [
+        14.85,
+        1.45,
+        5
+      ],
+      "material": "lifejacket",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "orange-vest-right",
+      "size": [
+        0.22,
+        0.85,
+        0.25
+      ],
+      "position": [
+        15.15,
+        1.45,
+        5
+      ],
+      "material": "lifejacket",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "orange-vest-left",
+      "size": [
+        0.22,
+        0.85,
+        0.25
+      ],
+      "position": [
+        15.65,
+        1.45,
+        5
+      ],
+      "material": "lifejacket",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "orange-vest-right",
+      "size": [
+        0.22,
+        0.85,
+        0.25
+      ],
+      "position": [
+        15.950000000000001,
+        1.45,
+        5
+      ],
+      "material": "lifejacket",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "wind-flag",
+      "size": [
+        2.5,
+        0.85,
+        0.035
+      ],
+      "position": [
+        -11.7,
+        5.45,
+        6
+      ],
+      "material": "lifejacket",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "weather-desk",
+      "size": [
+        3,
+        1,
+        1.2
+      ],
+      "position": [
+        -10,
+        0.5,
+        7.3
+      ],
+      "material": "ivory-walls",
+      "collision": true,
+      "visible": true
+    },
+    {
+      "name": "pier-deck",
+      "size": [
+        4,
+        0.3,
+        17.6
+      ],
+      "position": [
+        -14,
+        -0.115,
+        -21.7
+      ],
+      "material": "pier-wood",
+      "collision": true,
+      "visible": true
+    },
+    {
+      "name": "training-dinghy",
+      "size": [
+        2.6,
+        0.6,
+        4.5
+      ],
+      "position": [
+        -9.5,
+        0.1,
+        -26
+      ],
+      "material": "ivory-walls",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "dinghy-boom",
+      "size": [
+        0.08,
+        0.08,
+        3
+      ],
+      "position": [
+        -9.5,
+        1.5,
+        -24.8
+      ],
+      "material": "pier-wood",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "wave",
+      "size": [
+        12,
+        0.018,
+        0.09
+      ],
+      "position": [
+        -40,
+        -0.28,
+        -18
+      ],
+      "material": "foam",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "wave",
+      "size": [
+        15,
+        0.018,
+        0.09
+      ],
+      "position": [
+        -24,
+        -0.28,
+        -23
+      ],
+      "material": "foam",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "wave",
+      "size": [
+        18,
+        0.018,
+        0.09
+      ],
+      "position": [
+        -8,
+        -0.28,
+        -28
+      ],
+      "material": "foam",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "wave",
+      "size": [
+        21,
+        0.018,
+        0.09
+      ],
+      "position": [
+        8,
+        -0.28,
+        -18
+      ],
+      "material": "foam",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "wave",
+      "size": [
+        24,
+        0.018,
+        0.09
+      ],
+      "position": [
+        24,
+        -0.28,
+        -23
+      ],
+      "material": "foam",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "wave",
+      "size": [
+        27,
+        0.018,
+        0.09
+      ],
+      "position": [
+        40,
+        -0.28,
+        -28
+      ],
+      "material": "foam",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "bench-seat",
+      "size": [
+        3.3,
+        0.15,
+        0.7
+      ],
+      "position": [
+        -26,
+        0.65,
+        13
+      ],
+      "material": "pier-wood",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "bench-leg",
+      "size": [
+        0.15,
+        0.6,
+        0.5
+      ],
+      "position": [
+        -27.2,
+        0.3,
+        13
+      ],
+      "material": "club-navy",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "bench-leg",
+      "size": [
+        0.15,
+        0.6,
+        0.5
+      ],
+      "position": [
+        -24.8,
+        0.3,
+        13
+      ],
+      "material": "club-navy",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "bench-seat",
+      "size": [
+        3.3,
+        0.15,
+        0.7
+      ],
+      "position": [
+        28,
+        0.65,
+        13
+      ],
+      "material": "pier-wood",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "bench-leg",
+      "size": [
+        0.15,
+        0.6,
+        0.5
+      ],
+      "position": [
+        26.8,
+        0.3,
+        13
+      ],
+      "material": "club-navy",
+      "collision": false,
+      "visible": true
+    },
+    {
+      "name": "bench-leg",
+      "size": [
+        0.15,
+        0.6,
+        0.5
+      ],
+      "position": [
+        29.2,
+        0.3,
+        13
+      ],
+      "material": "club-navy",
+      "collision": false,
+      "visible": true
+    }
+  ],
+  "cylinders": [
+    {
+      "name": "weather-mast",
+      "height": 6,
+      "diameter": 0.09,
+      "position": [
+        -13,
+        3,
+        6
+      ],
+      "material": "metal"
+    },
+    {
+      "name": "pier-post",
+      "height": 2.2,
+      "diameter": 0.23,
+      "position": [
+        -15.7,
+        -0.5,
+        -13
+      ],
+      "material": "pier-wood"
+    },
+    {
+      "name": "pier-post",
+      "height": 2.2,
+      "diameter": 0.23,
+      "position": [
+        -15.7,
+        -0.5,
+        -20
+      ],
+      "material": "pier-wood"
+    },
+    {
+      "name": "pier-post",
+      "height": 2.2,
+      "diameter": 0.23,
+      "position": [
+        -15.7,
+        -0.5,
+        -28
+      ],
+      "material": "pier-wood"
+    },
+    {
+      "name": "pier-post",
+      "height": 2.2,
+      "diameter": 0.23,
+      "position": [
+        -12.3,
+        -0.5,
+        -13
+      ],
+      "material": "pier-wood"
+    },
+    {
+      "name": "pier-post",
+      "height": 2.2,
+      "diameter": 0.23,
+      "position": [
+        -12.3,
+        -0.5,
+        -20
+      ],
+      "material": "pier-wood"
+    },
+    {
+      "name": "pier-post",
+      "height": 2.2,
+      "diameter": 0.23,
+      "position": [
+        -12.3,
+        -0.5,
+        -28
+      ],
+      "material": "pier-wood"
+    },
+    {
+      "name": "dinghy-mast",
+      "height": 6,
+      "diameter": 0.08,
+      "position": [
+        -9.5,
+        3.1,
+        -26
+      ],
+      "material": "metal"
+    },
+    {
+      "name": "buoy",
+      "height": 0.8,
+      "diameter": 0.8,
+      "position": [
+        -30,
+        0.1,
+        -40
+      ],
+      "material": "lifejacket"
+    },
+    {
+      "name": "buoy",
+      "height": 0.8,
+      "diameter": 0.8,
+      "position": [
+        8,
+        0.1,
+        -48
+      ],
+      "material": "lifejacket"
+    },
+    {
+      "name": "buoy",
+      "height": 0.8,
+      "diameter": 0.8,
+      "position": [
+        30,
+        0.1,
+        -30
+      ],
+      "material": "lifejacket"
+    }
+  ],
+  "labels": [
+    {
+      "text": "ПАРУСНЫЙ КЛУБ",
+      "position": [
+        0,
+        4.4,
+        19.7
+      ],
+      "width": 8,
+      "height": 0.9,
+      "billboard": false
+    },
+    {
+      "text": "УЧЕБНЫЙ ПРИЧАЛ\nВетер → галс → право пути",
+      "position": [
+        14,
+        2.3,
+        15.85
+      ],
+      "width": 4.7,
+      "height": 1.5,
+      "billboard": false
+    },
+    {
+      "text": "СНАРЯЖЕНИЕ",
+      "position": [
+        23,
+        3.1,
+        -0.15
+      ],
+      "width": 5,
+      "height": 0.8,
+      "billboard": false
+    },
+    {
+      "text": "ЖИЛЕТЫ · E",
+      "position": [
+        15,
+        2.8,
+        5
+      ],
+      "width": 4,
+      "height": 0.7,
+      "billboard": true
+    },
+    {
+      "text": "МЕТЕОПОСТ",
+      "position": [
+        -10,
+        2.4,
+        7.3
+      ],
+      "width": 4,
+      "height": 0.7,
+      "billboard": true
+    },
+    {
+      "text": "УЧЕБНЫЙ ПИРС",
+      "position": [
+        -14,
+        2.8,
+        -12
+      ],
+      "width": 5,
+      "height": 0.8,
+      "billboard": true
+    },
+    {
+      "text": "ОСМОТР ЛОДКИ · E",
+      "position": [
+        -10,
+        6.6,
+        -26
+      ],
+      "width": 5,
+      "height": 0.8,
+      "billboard": true
+    },
+    {
+      "text": "ПЕРВЫЙ ДЕНЬ В АКАДЕМИИ",
+      "position": [
+        0,
+        2.5,
+        -5
+      ],
+      "width": 6,
+      "height": 0.8,
+      "billboard": true
+    }
+  ],
+  "npcs": [
+    {
+      "id": "captain",
+      "name": "Капитан Морозов",
+      "role": "Главный тренер · основы парусного спорта",
+      "color": "#e8b96b",
+      "x": 4,
+      "z": 3,
+      "skin": "skaterMaleA"
+    },
+    {
+      "id": "weather",
+      "name": "Метеоролог Ли",
+      "role": "Погода и безопасность",
+      "color": "#67cfc5",
+      "x": -10,
+      "z": 4,
+      "skin": "cyborgFemaleA"
+    },
+    {
+      "id": "judge",
+      "name": "Судья Анна",
+      "role": "Правила и право пути",
+      "color": "#a6b9f5",
+      "x": 10,
+      "z": 11,
+      "skin": "skaterFemaleA"
+    },
+    {
+      "id": "sailor",
+      "name": "Михалыч",
+      "role": "Морские слова и жизнь у причала",
+      "color": "#e69b7a",
+      "x": -10,
+      "z": -12,
+      "skin": "criminalMaleA"
+    }
+  ],
+  "stations": {
+    "vest": [
+      15,
+      0,
+      5
+    ],
+    "pier": [
+      -14,
+      0,
+      -26
+    ]
+  },
+  "props": [
+    [
+      "environment/tree_palm_tall",
+      -23,
+      -7,
+      1.6
+    ],
+    [
+      "environment/tree_palm_tall",
+      27,
+      -8,
+      1.8
+    ],
+    [
+      "environment/tree_palm_bend",
+      -25,
+      17,
+      1.6
+    ],
+    [
+      "environment/tree_palm_tall",
+      30,
+      22,
+      1.7
+    ],
+    [
+      "environment/bush_large",
+      -20,
+      23,
+      1.5
+    ],
+    [
+      "environment/bush_large",
+      25,
+      18,
+      1.3
+    ],
+    [
+      "environment/rock_large_a",
+      -30,
+      -9,
+      1.8
+    ],
+    [
+      "environment/rock_small_a",
+      32,
+      -10,
+      1.7
+    ],
+    [
+      "props/crate",
+      18,
+      1,
+      1
+    ],
+    [
+      "props/crate",
+      19,
+      2,
+      0.8
+    ]
+  ],
+  "special": {
+    "bow": {
+      "position": [
+        -9.5,
+        0.1,
+        -28
+      ],
+      "height": 0.6,
+      "diameter": 2.6
+    },
+    "sail": {
+      "position": [
+        -9.5,
+        3.35,
+        -25.2
+      ],
+      "scale": [
+        0.85,
+        1,
+        1.2
+      ],
+      "diameter": 5
+    }
+  }
+}
