@@ -1,2 +1,158 @@
-/shared/world/backups/
-/server/data/admins.json
+
+# ==========================================
+# Sail Academy — .gitignore
+# ==========================================
+
+# ------------------------------------------
+# Python: bytecode and caches
+# ------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyright/
+.tox/
+.nox/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+
+# ------------------------------------------
+# Python: virtual environments
+# ------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# ------------------------------------------
+# Python: builds and packages
+# ------------------------------------------
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+
+# ------------------------------------------
+# Python: package tools
+# ------------------------------------------
+.pdm-python
+.pdm-build/
+__pypackages__/
+.python-version
+
+# ------------------------------------------
+# Node.js / TypeScript / Vite
+# ------------------------------------------
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+
+*.tsbuildinfo
+.vite/
+.vite-temp/
+.cache/
+
+# ------------------------------------------
+# JavaScript: logs
+# ------------------------------------------
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ------------------------------------------
+# Environment variables and secrets
+# ------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ------------------------------------------
+# Databases and runtime state
+# ------------------------------------------
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# ------------------------------------------
+# Runtime logs
+# ------------------------------------------
+*.log
+logs/
+log/
+
+# ------------------------------------------
+# Temporary files
+# ------------------------------------------
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+
+# ------------------------------------------
+# Editors and IDEs
+# ------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+!.vscode/launch.example.json
+
+.idea/
+*.code-workspace
+
+# ------------------------------------------
+# OS generated files
+# ------------------------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.Trash-*/
+
+# ------------------------------------------
+# Local backups and archives
+# ------------------------------------------
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+
+# ------------------------------------------
+# Local runtime uploads
+# ------------------------------------------
+uploads/
+local_data/
+
+# ------------------------------------------
+# Keep important project files tracked
+# ------------------------------------------
+!package.json
+!package-lock.json
+!pnpm-lock.yaml
+!yarn.lock
+!pyproject.toml
+!uv.lock
+!requirements.txt
