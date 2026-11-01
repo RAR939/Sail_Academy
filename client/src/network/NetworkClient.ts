@@ -87,7 +87,7 @@ export class NetworkClient {
   }
 
   /** Подключается к WebSocket и разрешается после получения welcome. */
-  public connect(url: string, token: string): Promise<WelcomeMessage> {
+  public connect(url: string, token: string, skin = "skaterMaleA"): Promise<WelcomeMessage> {
     if (this.status !== "disconnected") {
       return Promise.reject(new Error("WebSocket уже подключён или подключается"));
     }
@@ -135,7 +135,7 @@ export class NetworkClient {
       socket.addEventListener("open", () => {
         if (this.socket !== socket) return;
 
-        this.sendRaw({ t: "auth", token });
+        this.sendRaw({ t: "auth", token, skin });
         this.welcomeTimer = window.setTimeout(() => {
           fail(new Error("Сервер не прислал welcome после авторизации"));
           socket.close(4000, "Welcome timeout");

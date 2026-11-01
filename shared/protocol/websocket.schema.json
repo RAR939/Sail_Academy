@@ -51,6 +51,14 @@
         },
         "boat": {
           "$ref": "#/$defs/boat"
+        },
+        "skin": {
+          "enum": [
+            "skaterMaleA",
+            "skaterFemaleA",
+            "criminalMaleA",
+            "cyborgFemaleA"
+          ]
         }
       },
       "additionalProperties": false
@@ -107,6 +115,14 @@
             "token": {
               "type": "string",
               "minLength": 1
+            },
+            "skin": {
+              "enum": [
+                "skaterMaleA",
+                "skaterFemaleA",
+                "criminalMaleA",
+                "cyborgFemaleA"
+              ]
             }
           },
           "additionalProperties": false

@@ -116,3 +116,5 @@ input::placeholder { color: #63829f; opacity: 1; }
 .network-auth-root[hidden] {
   display: none;
 }
+.skin-choice { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 12px 0; color: #fff; }
+.skin-choice select { padding: 8px; border-radius: 8px; max-width: 65%; }

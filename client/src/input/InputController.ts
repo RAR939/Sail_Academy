@@ -36,19 +36,32 @@ export class InputController {
       return;
     }
 
-    event.preventDefault();
+    if (this.enabled) event.preventDefault();
     this.pressed.delete(event.code);
   };
 
-  private readonly onWindowBlur = (): void => {
+  private readonly clearInput = (): void => {
     this.pressed.clear();
     this.interactionQueued = false;
   };
 
+  private readonly onVisibilityChange = (): void => {
+    if (document.hidden) this.clearInput();
+  };
+
+  private readonly onPointerLockChange = (): void => {
+    // A keyup can be lost when Esc releases pointer lock.
+    if (!document.pointerLockElement) this.clearInput();
+  };
+
   public constructor() {
     window.addEventListener("keydown", this.onKeyDown);
-    window.addEventListener("keyup", this.onKeyUp);
-    window.addEventListener("blur", this.onWindowBlur);
+    // Capture keyup even if a focused overlay stops propagation.
+    window.addEventListener("keyup", this.onKeyUp, true);
+    window.addEventListener("blur", this.clearInput);
+    window.addEventListener("pagehide", this.clearInput);
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
+    document.addEventListener("pointerlockchange", this.onPointerLockChange);
   }
 
   public getPlayerInput(cameraRig: CameraRig): PlayerInput {
@@ -67,6 +80,7 @@ export class InputController {
     const rightAxis =
       this.axis("KeyD", "ArrowRight") - this.axis("KeyA", "ArrowLeft");
 
+    cameraRig.setMovementAxes(forwardAxis, rightAxis);
     const { forward, right } = cameraRig.getMovementBasis();
 
     const movement = forward
@@ -91,16 +105,18 @@ export class InputController {
     this.enabled = enabled;
 
     if (!enabled) {
-      this.pressed.clear();
-      this.interactionQueued = false;
+      this.clearInput();
     }
   }
 
   public dispose(): void {
     window.removeEventListener("keydown", this.onKeyDown);
-    window.removeEventListener("keyup", this.onKeyUp);
-    window.removeEventListener("blur", this.onWindowBlur);
-    this.pressed.clear();
+    window.removeEventListener("keyup", this.onKeyUp, true);
+    window.removeEventListener("blur", this.clearInput);
+    window.removeEventListener("pagehide", this.clearInput);
+    document.removeEventListener("visibilitychange", this.onVisibilityChange);
+    document.removeEventListener("pointerlockchange", this.onPointerLockChange);
+    this.clearInput();
   }
 
   private axis(primary: string, alternate: string): number {

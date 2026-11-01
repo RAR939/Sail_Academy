@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.content import NPCS, STEPS, STORY_REPLIES
+from app.admin import world as world_config
 from app.ai.service import answer
 from app.database.connection import get_db
 from app.database.models import NPCMemory, Progress, User
@@ -48,6 +49,12 @@ def index_of(row: Progress) -> int:
 def snapshot(row: Progress) -> dict:
     index = index_of(row)
     step_id, title, description, target, (x, z) = STEPS[index]
+    world = world_config.read()[0]
+    npc_positions = {npc.id: (npc.x, npc.z) for npc in world.npcs}
+    if target in npc_positions:
+        x, z = npc_positions[target]
+    elif target in world.stations:
+        x, _, z = world.stations[target]
     return {
         "step": step_id, "index": index, "total": len(STEPS) - 1,
         "title": title, "description": description,
@@ -78,8 +85,8 @@ async def get_story(user: User = Depends(get_current_user), session: AsyncSessio
 async def interact(data: InteractionRequest, user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
     if data.target not in ("vest", "pier"):
         raise HTTPException(400, "Неизвестный предмет.")
-    position = (15, 5) if data.target == "vest" else (-14, -26)
-    require_near(user.id, position)
+    x, _, z = world_config.read()[0].stations[data.target]
+    require_near(user.id, (x, z))
     async with story_lock:
         row = await progress_row(session, user.id)
         index = index_of(row)
@@ -103,7 +110,9 @@ async def dialog(data: DialogRequest, user: User = Depends(get_current_user), se
         raise HTTPException(404, "Такого наставника нет.")
     if not data.text.strip():
         raise HTTPException(422, "Введите вопрос.")
-    require_near(user.id, npc["position"])
+    location = next(item for item in world_config.read()[0].npcs if item.id == data.npc_id)
+    npc = {**npc, "name": location.name, "position": (location.x, location.z)}
+    require_near(user.id, (location.x, location.z))
     # Bound queueing as well as model time; serialize memory updates for this demo.
     try:
         await asyncio.wait_for(dialogue_lock.acquire(), timeout=2)

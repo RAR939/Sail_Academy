@@ -8,6 +8,7 @@ export interface NetworkLoginValues {
   username: string;
   password: string;
   mode: AuthMode;
+  skin: string;
 }
 
 export class NetworkLoginOverlay {
@@ -91,6 +92,14 @@ export class NetworkLoginOverlay {
               />
             </label>
 
+            <label class="skin-choice">Персонаж
+              <select id="skin" aria-label="Выбор персонажа">
+                <option value="skaterMaleA">Скейтбордист</option>
+                <option value="skaterFemaleA">Скейтбордистка</option>
+                <option value="criminalMaleA">Искатель приключений</option>
+                <option value="cyborgFemaleA">Киборг</option>
+              </select>
+            </label>
             <p id="auth-message" class="message"></p>
 
             <button id="submit-button" class="primary-button" type="submit">
@@ -168,6 +177,7 @@ export class NetworkLoginOverlay {
         username,
         password,
         mode: this.mode,
+        skin: this.root.querySelector<HTMLSelectElement>("#skin")!.value,
       });
     } catch (error) {
       this.showMessage(
