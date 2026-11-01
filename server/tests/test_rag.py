@@ -164,3 +164,85 @@ def test_real_generation_uses_retrieved_source():
         assert backend == 'ollama' and text.strip()
         assert any('sailing_basics/' in source['id'] for source in rag['sources'])
     asyncio.run(run())
+
+
+def test_pdf_indexing_page_numbers_updates_and_failures(tmp_path, monkeypatch):
+    import pymupdf
+    root = tmp_path / 'knowledge'
+    root.mkdir()
+    pdf_path = tmp_path / 'rules.pdf'
+    db = str(tmp_path / 'rag.sqlite3')
+    calls = []
+
+    def write_pdf(text):
+        pdf = pymupdf.open()
+        pdf.new_page().insert_text((72, 72), text)
+        pdf.new_page().insert_text((72, 72), 'Second page. Boats on different tacks must keep clear.')
+        pdf.save(pdf_path)
+        pdf.close()
+
+    async def embed(texts):
+        calls.extend(texts)
+        return [[1., 0.] for _ in texts]
+
+    async def run():
+        write_pdf('Rule ten. A port tack boat keeps clear of starboard.')
+        monkeypatch.setattr(indexer, 'embed', embed)
+        assert (await indexer.update_index(root, db, pdf_path=pdf_path))['changed'] == 1
+        previous_calls = len(calls)
+        assert (await indexer.update_index(root, db, pdf_path=pdf_path))['changed'] == 0
+        assert len(calls) == previous_calls
+        results = retriever._search([1., 0.], 'judge', db, 10, .73)
+        assert {r['page'] for r in results} == {1, 2}
+        assert all(r['source'] == indexer.PDF_SOURCE for r in results)
+        assert all('#page=' in r['id'] for r in results)
+        pdf_path.unlink()
+        write_pdf('A modified rule text replaces the old document.')
+        async def fail(_): raise OSError('Ollama unavailable')
+        monkeypatch.setattr(indexer, 'embed', fail)
+        with pytest.raises(OSError):
+            await indexer.update_index(root, db, pdf_path=pdf_path)
+        assert any('port tack' in r['text'] for r in retriever._search([1., 0.], 'judge', db, 10, .73))
+        monkeypatch.setattr(indexer, 'embed', embed)
+        await indexer.update_index(root, db, pdf_path=pdf_path)
+        assert any('modified' in r['text'] for r in retriever._search([1., 0.], 'judge', db, 10, .73))
+        pdf_path.unlink()
+        assert (await indexer.update_index(root, db, pdf_path=pdf_path))['deleted'] == 1
+        assert not retriever._search([1., 0.], 'judge', db, 10, .73)
+    asyncio.run(run())
+
+
+def test_pdf_sources_remain_diagnostic_and_not_added_to_npc_reply(monkeypatch):
+    async def retrieve(*args):
+        return [{'id': 'ai/sail_ai/resources/PPG_2025_2028.pdf#page=18&chunk=6',
+                 'source': 'ai/sail_ai/resources/PPG_2025_2028.pdf', 'category': 'racing_rules',
+                 'text': 'Сведения из правил.', 'score': .9, 'page': 18}], {}
+    async def run_sync(fn, *args): return fn(*args)
+    monkeypatch.setattr(service, 'retrieve', retrieve)
+    monkeypatch.setattr(service, 'generate_local', lambda _: 'Объяснение судьи.')
+    monkeypatch.setattr(service.asyncio, 'to_thread', run_sync)
+    text, backend, rag = asyncio.run(service.answer('judge', 'Что говорит правило 10?', [], '', False))
+    assert backend == 'ollama'
+    assert text == 'Объяснение судьи.'
+    assert 'ППГ' not in text and 'страниц' not in text
+    assert rag['sources'][0]['page'] == 18
+
+
+def test_pdf_relevance_rejects_unrelated_and_finds_rules():
+    assert retriever.pdf_relevance('Как приготовить пиццу?', 'Пригласите свидетелей на рассмотрение.') is None
+    rule = '10 НА ПРОТИВОПОЛОЖНЫХ ГАЛСАХ Яхта левого галса сторонится яхты правого галса.'
+    assert retriever.pdf_relevance('Что говорит правило 10?', rule) >= .2
+    assert retriever.pdf_relevance('Кто уступает на правом галсе?', rule) > .1
+    assert not retriever.is_rules_question('Что такое оверштаг?')
+
+
+@pytest.mark.skipif(os.environ.get('RUN_OLLAMA_INTEGRATION') != '1', reason='requires local Ollama models and indexed PDF')
+def test_real_rules_pdf_used_without_citations_in_reply():
+    async def run():
+        text, backend, rag = await service.answer('judge', 'Что говорит правило 10 о противоположных галсах?', [], '', False)
+        assert backend == 'ollama' and text.strip()
+        assert 'ППГ' not in text and 'PDF' not in text.upper()
+        assert any(source.get('page') == 18 and source['source'] == indexer.PDF_SOURCE for source in rag['sources'])
+        hits, _ = await retriever.retrieve('Как приготовить пиццу?', 'judge')
+        assert not hits
+    asyncio.run(run())
