@@ -82,5 +82,263 @@ def test_real_semantic_search():
                                    ('спасательный жилет', 'жилет'), ('правый галс', 'прав')]:
             results, _ = await retriever.retrieve(question, 'captain')
             assert any(expected in item['text'].lower() for item in results), (question, results)
+        for question in ('Как приготовить пиццу?', 'Сколько спутников у Юпитера?'):
+            results, _ = await retriever.retrieve(question, 'captain')
+            assert not results, (question, results)
     asyncio.run(run())
 
+
+
+def test_query_embedding_search_and_deduplication(tmp_path, monkeypatch):
+    """The search consumes a query vector and returns ranked, distinct sources."""
+    root = tmp_path / 'knowledge'
+    for category in ('sailing_basics', 'weather_safety'):
+        (root / category).mkdir(parents=True)
+    (root / 'sailing_basics' / 'turn.txt').write_text(
+        'Поворот носом через направление ветра называется оверштаг.\n\n'
+        'Поворот носом через направление ветра называется оверштаг.', encoding='utf8')
+    (root / 'weather_safety' / 'vest.txt').write_text('Наденьте спасательный жилет.', encoding='utf8')
+    path = str(tmp_path / 'index.sqlite3')
+    requests = []
+
+    async def fake_embed(texts):
+        requests.extend(texts)
+        return [[0., 1.] if 'жилет' in t else [1., 0.] for t in texts]
+
+    async def run():
+        monkeypatch.setattr(indexer, 'embed', fake_embed)
+        monkeypatch.setattr(retriever, 'embed', fake_embed)
+        monkeypatch.setattr(retriever.settings, 'RAG_INDEX_PATH', path)
+        await indexer.update_index(root, path)
+        hits, _ = await retriever.retrieve('Как поворачивать против ветра?', 'captain')
+        assert len(hits) == 1 and 'оверштаг' in hits[0]['text']
+        assert hits[0]['source'] == 'sailing_basics/turn.txt'
+        assert hits[0]['score'] == pytest.approx(1.)
+        assert requests[-1].startswith('search_query: ')
+        assert all(t.startswith('search_document: ') for t in requests[:-1])
+        vest, _ = await retriever.retrieve('спасательный жилет', 'weather')
+        assert vest[0]['category'] == 'weather_safety'
+        await retriever.retrieve('Как пройти гонку?', 'judge', [{'role': 'user', 'content': 'Что такое правило 10?'}])
+        assert requests[-1] == 'search_query: Как пройти гонку?'
+        await retriever.retrieve('Что такое швартов?', 'sailor', [{'role': 'user', 'content': 'тупой ты'}])
+        assert requests[-1] == 'search_query: Что такое швартов?'
+        await retriever.retrieve('А зачем?', 'sailor', [{'role': 'user', 'content': 'Что такое швартов?'}])
+        assert requests[-1] == 'search_query: Что такое швартов?\nА зачем?'
+        with pytest.raises(FileNotFoundError):
+            await indexer.update_index(tmp_path / 'missing', path)
+        assert retriever._search([1, 0], 'captain', path, 4, .73)
+
+    asyncio.run(run())
+
+
+def test_invalid_embedding_response(monkeypatch):
+    from app.ai import embeddings
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def read(self): return b'{"embeddings": [[1, 2], [0]]}'
+    monkeypatch.setattr(embeddings.urllib.request, 'urlopen', lambda *args, **kwargs: Response())
+    with pytest.raises(ValueError):
+        embeddings._embed(['a', 'b'])
+
+
+def test_administrator_personality_and_facts_are_combined_with_rag(monkeypatch):
+    captured = []
+    async def retrieve(*args):
+        return [{'id': 'general/example#1', 'source': 'general/example', 'category': 'general',
+                 'text': 'Проверенный факт.', 'score': .9}], {}
+    async def run_sync(fn, *args):
+        return fn(*args)
+    def generate(messages):
+        captured.extend(messages)
+        return 'Ответ.'
+    monkeypatch.setattr(service, 'retrieve', retrieve)
+    monkeypatch.setattr(service, 'generate_local', generate)
+    monkeypatch.setattr(service.asyncio, 'to_thread', run_sync)
+    asyncio.run(service.answer('captain', 'Вопрос', [], '', False,
+                               {'name': 'Капитан', 'style': 'Строгий стиль', 'facts': 'Добавленный факт'}))
+    prompt = captured[0]['content']
+    assert 'Строгий стиль' in prompt
+    assert 'Добавленный факт' in prompt
+    assert '[general/example#1] Проверенный факт.' in prompt
+
+
+@pytest.mark.skipif(os.environ.get('RUN_OLLAMA_INTEGRATION') != '1', reason='requires local Ollama models and indexed corpus')
+def test_real_generation_uses_retrieved_source():
+    async def run():
+        text, backend, rag = await service.answer('captain', 'Что такое оверштаг?', [], '', False)
+        assert backend == 'ollama' and text.strip()
+        assert any('sailing_basics/' in source['id'] for source in rag['sources'])
+    asyncio.run(run())
+
+
+def test_pdf_indexing_page_numbers_updates_and_failures(tmp_path, monkeypatch):
+    import pymupdf
+    root = tmp_path / 'knowledge'
+    root.mkdir()
+    pdf_path = tmp_path / 'rules.pdf'
+    db = str(tmp_path / 'rag.sqlite3')
+    calls = []
+
+    def write_pdf(text):
+        pdf = pymupdf.open()
+        pdf.new_page().insert_text((72, 72), text)
+        pdf.new_page().insert_text((72, 72), 'Second page. Boats on different tacks must keep clear.')
+        pdf.save(pdf_path)
+        pdf.close()
+
+    async def embed(texts):
+        calls.extend(texts)
+        return [[1., 0.] for _ in texts]
+
+    async def run():
+        write_pdf('Rule ten. A port tack boat keeps clear of starboard.')
+        monkeypatch.setattr(indexer, 'embed', embed)
+        assert (await indexer.update_index(root, db, pdf_path=pdf_path))['changed'] == 1
+        previous_calls = len(calls)
+        assert (await indexer.update_index(root, db, pdf_path=pdf_path))['changed'] == 0
+        assert len(calls) == previous_calls
+        results = retriever._search([1., 0.], 'judge', db, 10, .73)
+        assert {r['page'] for r in results} == {1, 2}
+        assert all(r['source'] == indexer.PDF_SOURCE for r in results)
+        assert all('#page=' in r['id'] for r in results)
+        pdf_path.unlink()
+        write_pdf('A modified rule text replaces the old document.')
+        async def fail(_): raise OSError('Ollama unavailable')
+        monkeypatch.setattr(indexer, 'embed', fail)
+        with pytest.raises(OSError):
+            await indexer.update_index(root, db, pdf_path=pdf_path)
+        assert any('port tack' in r['text'] for r in retriever._search([1., 0.], 'judge', db, 10, .73))
+        monkeypatch.setattr(indexer, 'embed', embed)
+        await indexer.update_index(root, db, pdf_path=pdf_path)
+        assert any('modified' in r['text'] for r in retriever._search([1., 0.], 'judge', db, 10, .73))
+        pdf_path.unlink()
+        assert (await indexer.update_index(root, db, pdf_path=pdf_path))['deleted'] == 1
+        assert not retriever._search([1., 0.], 'judge', db, 10, .73)
+    asyncio.run(run())
+
+
+def test_pdf_sources_remain_diagnostic_and_not_added_to_npc_reply(monkeypatch):
+    async def retrieve(*args):
+        return [{'id': 'ai/sail_ai/resources/PPG_2025_2028.pdf#page=18&chunk=6',
+                 'source': 'ai/sail_ai/resources/PPG_2025_2028.pdf', 'category': 'racing_rules',
+                 'text': 'Сведения из правил.', 'score': .9, 'page': 18}], {}
+    async def run_sync(fn, *args): return fn(*args)
+    monkeypatch.setattr(service, 'retrieve', retrieve)
+    monkeypatch.setattr(service, 'generate_local', lambda _: 'Объяснение судьи.')
+    monkeypatch.setattr(service.asyncio, 'to_thread', run_sync)
+    text, backend, rag = asyncio.run(service.answer('judge', 'Что говорит правило 10?', [], '', False))
+    assert backend == 'ollama'
+    assert text == 'Объяснение судьи.'
+    assert 'ППГ' not in text and 'страниц' not in text
+    assert rag['sources'][0]['page'] == 18
+
+
+def test_pdf_relevance_rejects_unrelated_and_finds_rules():
+    assert retriever.pdf_relevance('Как приготовить пиццу?', 'Пригласите свидетелей на рассмотрение.') is None
+    rule = '10 НА ПРОТИВОПОЛОЖНЫХ ГАЛСАХ Яхта левого галса сторонится яхты правого галса.'
+    assert retriever.pdf_relevance('Что говорит правило 10?', rule) >= .2
+    assert retriever.pdf_relevance('Кто уступает на правом галсе?', rule) > .1
+    assert not retriever.is_rules_question('Что такое оверштаг?')
+
+
+@pytest.mark.skipif(os.environ.get('RUN_OLLAMA_INTEGRATION') != '1', reason='requires local Ollama models and indexed PDF')
+def test_real_rules_pdf_used_without_citations_in_reply():
+    async def run():
+        text, backend, rag = await service.answer('judge', 'Что говорит правило 10 о противоположных галсах?', [], '', False)
+        assert backend == 'ollama' and text.strip()
+        assert 'ППГ' not in text and 'PDF' not in text.upper()
+        assert any(source.get('page') == 18 and source['source'] == indexer.PDF_SOURCE for source in rag['sources'])
+        hits, _ = await retriever.retrieve('Как приготовить пиццу?', 'judge')
+        assert not hits
+    asyncio.run(run())
+
+
+def test_gameplay_questions_do_not_mask_explicit_rules_questions():
+    assert retriever.is_gameplay_question('Как пройти дистанцию в игровой гонке?')
+    assert retriever.is_gameplay_question('Как пройти гонку?')
+    assert retriever.is_gameplay_question('Как управлять лодкой во время гонки?')
+    assert not retriever.is_gameplay_question('Какое правило 10 действует в игре?')
+    assert not retriever.is_gameplay_question('Кто должен уступить на правом галсе?')
+    assert not retriever.has_topic_overlap('Как приготовить пиццу?', 'Как пройти дистанцию в игровой гонке')
+    assert retriever.has_topic_overlap('Как работает шверт?', 'Шверт уменьшает боковой снос.')
+
+
+def test_repetition_is_retried_without_losing_history(monkeypatch):
+    old = 'Ветер вдруг всплеснул как у бабы с бородой и снова подул.'
+    history = [{'role': 'user', 'content': 'Привет'}, {'role': 'assistant', 'content': old}]
+    calls = []
+
+    async def retrieve(*args): return [], {}
+    async def run_sync(fn, *args): return fn(*args)
+    def generate(messages):
+        calls.append([dict(message) for message in messages])
+        return old if len(calls) == 1 else 'Не понял тебя. Уточни, пожалуйста.'
+
+    monkeypatch.setattr(service, 'retrieve', retrieve)
+    monkeypatch.setattr(service, 'generate_local', generate)
+    monkeypatch.setattr(service.asyncio, 'to_thread', run_sync)
+    result, backend, _ = asyncio.run(service.answer('sailor', 'Как дела?', history, '', False))
+    assert backend == 'ollama' and result == 'Не понял тебя. Уточни, пожалуйста.'
+    assert len(calls) == 2
+    assert calls[1][-2] == history[0] and calls[1][-1]['content'] == 'Как дела?'
+    assert all(message['role'] != 'assistant' for message in calls[1])
+    assert 'повторял старую фразу' in calls[1][0]['content']
+
+
+def test_repetition_check_allows_exact_sourced_fact():
+    fact = 'Поворот носом через направление ветра называется поворотом оверштаг.'
+    history = [{'role': 'assistant', 'content': fact}]
+    assert service.repeats_old_phrase(fact, history, '')
+    assert not service.repeats_old_phrase(fact, history, fact)
+
+
+def test_unintelligible_input_does_not_recycle_old_story(monkeypatch):
+    captured = []
+    async def retrieve(*args):
+        return [{'id': 'x', 'text': 'Погода.', 'source': 'x', 'category': 'general', 'score': .9}], {}
+    async def run_sync(fn, *args): return fn(*args)
+    def generate(messages):
+        captured.extend(messages)
+        return 'Не понял тебя, уточни.'
+    monkeypatch.setattr(service, 'retrieve', retrieve)
+    monkeypatch.setattr(service, 'generate_local', generate)
+    monkeypatch.setattr(service.asyncio, 'to_thread', run_sync)
+    text, _, rag = asyncio.run(service.answer('sailor', 'хххх', [
+        {'role': 'user', 'content': 'Привет'},
+        {'role': 'assistant', 'content': 'Придуманная погода'},
+    ], '', False))
+    assert text == 'Не понял тебя, уточни.' and not rag['used']
+    assert [item['role'] for item in captured] == ['system', 'user']
+    assert 'Погода.' not in captured[0]['content']
+
+
+def test_repeated_output_after_retry_is_not_reported_as_success(monkeypatch):
+    old = 'Ветер вдруг всплеснул как у бабы с бородой и снова подул.'
+    async def retrieve(*args): return [], {}
+    async def run_sync(fn, *args): return fn(*args)
+    monkeypatch.setattr(service, 'retrieve', retrieve)
+    monkeypatch.setattr(service, 'generate_local', lambda _: old)
+    monkeypatch.setattr(service.asyncio, 'to_thread', run_sync)
+    with pytest.raises(service.AIUnavailable):
+        asyncio.run(service.answer('sailor', 'Как дела?', [{'role': 'assistant', 'content': old}], '', False))
+
+
+@pytest.mark.skipif(os.environ.get('RUN_OLLAMA_INTEGRATION') != '1', reason='requires local Ollama models and indexed knowledge')
+def test_real_gameplay_and_boat_material_retrieval():
+    async def run():
+        for npc, question, words in [
+            ('captain', 'Из каких частей состоит учебная лодка?', ('мачта', 'шверт')),
+            ('captain', 'Что такое шверт и зачем он нужен?', ('шверт',)),
+            ('judge', 'Как пройти дистанцию в игровой гонке?', ('четыре', 'финиш')),
+            ('judge', 'Как управлять лодкой во время гонки?', ('клавиш', 'шкот')),
+        ]:
+            hits, _ = await retriever.retrieve(question, npc)
+            found = [hit for hit in hits if hit['source'] == 'general/boat_and_race.txt']
+            assert found, (question, hits)
+            text = ' '.join(hit['text'].lower() for hit in found)
+            assert all(word in text for word in words), (question, text)
+            assert not any(hit['source'].endswith('.pdf') for hit in hits)
+        rules, _ = await retriever.retrieve('Что говорит правило 10 о противоположных галсах?', 'judge')
+        assert any(hit['source'].endswith('PPG_2025_2028.pdf') for hit in rules)
+    asyncio.run(run())

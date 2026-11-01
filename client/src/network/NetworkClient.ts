@@ -241,6 +241,8 @@ export class NetworkClient {
 
   public startRace(): void { this.send({ t: "start_race" }); }
 
+  public sendChat(text: string): void { this.send({ t: "chat", text }); }
+
   public ping(): void {
     this.pingSentAt = performance.now();
     this.send({ t: "ping" });

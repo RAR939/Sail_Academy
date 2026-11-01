@@ -130,3 +130,15 @@ Errors are currently plain text messages; there are no stable error codes yet.
 ## Not part of the current contract
 
 Do not implement these as if they already exist: `chunk_req`, `chunk`, `chunk_drop`, `race_state`, chat, NPC dialogue, quest updates, structured error codes, or rudder/mainsheet boat controls.
+
+### Room chat
+
+After authentication, a client can send `{"t":"chat","text":"Привет!"}`.
+The server trims and validates the text (1–400 characters), limits each
+connection to five messages per eight seconds, and broadcasts only to the
+sender's current room, including the sender. It derives the author from the
+authenticated session; client-supplied author fields are ignored. A message has
+`{"t":"chat","user_id":12,"username":"sailor","text":"Привет!","roomId":"hub"}`.
+Validation and rate-limit failures are sent only to the sender as
+`{"t":"chat_error","message":"..."}`. Messages are not stored on the server;
+the client clears its local history when changing rooms or disconnecting.

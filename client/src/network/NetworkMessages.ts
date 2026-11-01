@@ -71,6 +71,7 @@ export type ClientMessage =
   | BoatInputMessage
   | CreateRaceMessage
   | { t: "start_race" }
+  | { t: "chat"; text: string }
   | { t: "metrics"; fps: number; ping: number | null }
   | EnterLocationMessage;
 
@@ -101,6 +102,19 @@ export interface PongMessage {
 
 export interface ErrorMessage {
   t: "error";
+  message: string;
+}
+
+export interface ChatMessage {
+  t: "chat";
+  user_id: number;
+  username: string;
+  text: string;
+  roomId: string;
+}
+
+export interface ChatErrorMessage {
+  t: "chat_error";
   message: string;
 }
 
@@ -154,6 +168,8 @@ export type ServerMessage =
   | WindMessage
   | PongMessage
   | ErrorMessage
+  | ChatMessage
+  | ChatErrorMessage
   | LocationChangedMessage
   | RaceCreatedMessage
   | RaceLobbyMessage

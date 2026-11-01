@@ -52,9 +52,9 @@ def test_permissions_validation_and_rollback(editor):
     copies = client.get('/api/admin/world/backups').json()['backups']
     assert len(copies) == 1
     name = copies[0]['id']
-    assert client.get('/api/admin/world/backups/' + name).json()['world']['player']['runSpeed'] == 4
+    assert client.get('/api/admin/world/backups/' + name).json()['world']['player']['runSpeed'] == initial['world']['player']['runSpeed']
     assert client.post('/api/admin/world/restore', json={'backup': name, 'revision': saved_revision}).status_code == 200
-    assert client.get('/api/world').json()['world']['player']['runSpeed'] == 4
+    assert client.get('/api/world').json()['world']['player']['runSpeed'] == initial['world']['player']['runSpeed']
     assert len(client.get('/api/admin/world/backups').json()['backups']) == 2
     access.write_admin_ids(set())
     assert client.get('/api/admin/world/backups').status_code == 403

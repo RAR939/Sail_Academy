@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     OLLAMA_EMBED_MODEL: str = "nomic-embed-text"
     RAG_ENABLED: bool = True
     RAG_TOP_K: int = Field(default=4, ge=1, le=20)
-    RAG_MIN_SIMILARITY: float = Field(default=0.4, gt=0, le=1)
+    RAG_MIN_SIMILARITY: float = Field(default=0.73, gt=0, le=1)
     RAG_INDEX_PATH: str = "./rag_index.sqlite3"
     OLLAMA_TIMEOUT_SECONDS: float = Field(default=35, gt=0, le=120)
 

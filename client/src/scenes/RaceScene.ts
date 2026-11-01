@@ -16,10 +16,6 @@ export class RaceScene {
   private readonly anchor: TransformNode;
   private readonly hud = document.createElement("aside");
   private readonly status = document.createElement("p");
-  private readonly hint = document.createElement("p");
-  private audio: AudioContext | null = null;
-  private lastSignal = "";
-  private lastRacePhase = "";
   private readonly telemetry = document.createElement("p");
   private readonly lobbyText = document.createElement("p");
   private readonly startButton = document.createElement("button");
@@ -96,18 +92,6 @@ export class RaceScene {
     this.startButton.hidden = true;
     this.startButton.addEventListener("click", () => { this.startButton.disabled = true; this.network.startRace(); });
     this.status.textContent="Старт: пересеките линию между S и судейской лодкой.";
-    this.hint.textContent = "Подсказка: ждите начала отсчёта. Создатель комнаты запускает его кнопкой.";
-    const soundButton = document.createElement("button"); soundButton.type = "button"; soundButton.textContent = "Включить звуки сигналов";
-    soundButton.addEventListener("click", () => { this.audio ??= new AudioContext(); void this.audio.resume(); soundButton.textContent = "Звуки сигналов включены"; soundButton.disabled = true; });
-    const historyButton = document.createElement("button"), history = document.createElement("p");
-    historyButton.type = "button"; historyButton.textContent = "История гонок"; history.style.whiteSpace = "pre-line"; history.hidden = true;
-    historyButton.addEventListener("click", () => {
-      if (!history.hidden) { history.hidden = true; return; }
-      history.hidden = false; history.textContent = "Загрузка результатов…";
-      void this.network.raceHistory().then(races => {
-        history.textContent = races.length ? races.map(race => `${race.name} · ${race.startedAt ? new Date(`${race.startedAt}Z`).toLocaleString() : ""}\n${race.players.map(player => `${player.place ? `${player.place}.` : "–"} ${player.name}: ${player.elapsed === null ? "нет финиша" : `${player.elapsed.toFixed(1)} с`}`).join("\n")}`).join("\n\n") : "История гонок пока пуста.";
-      }).catch(() => { history.textContent = "Не удалось загрузить историю гонок."; });
-    });
     const controls=document.createElement("p"); controls.className="race-controls";
     controls.textContent="A / D или ← / → — румпель · Q — подобрать шкот · E — потравить шкот · мышь и колесо — камера. Стрелка над водой показывает, куда дует ветер. Огибайте каждый знак, оставляя его слева.";
     const windIndicator = document.createElement("div"); windIndicator.className = "race-wind-indicator";
@@ -123,7 +107,7 @@ export class RaceScene {
       catch { back.disabled = false; this.status.textContent = "Не удалось запросить возвращение на берег."; }
       window.setTimeout(() => { if (!this.disposed) back.disabled = false; }, 5000);
     });
-    this.hud.append(title,this.lobbyText,this.startButton,this.status,this.hint,windIndicator,this.telemetry,controls,soundButton,historyButton,history,back); document.body.append(this.hud);
+    this.hud.append(title,this.lobbyText,this.startButton,this.status,windIndicator,this.telemetry,controls,back); document.body.append(this.hud);
     window.addEventListener("keydown",this.onDown); window.addEventListener("keyup",this.onUp); window.addEventListener("blur",this.onBlur);
     this.unsubscribers.push(
       network.on("players",(message)=>this.updatePlayers(message.delta)),
@@ -269,9 +253,6 @@ export class RaceScene {
   private renderLobby(): void {
     const lobby = this.lobby; if (!lobby) return;
     const signal = lobby.phase === "countdown" && (lobby.secondsLeft ?? 0) <= 120 && (lobby.secondsLeft ?? 0) > 60 ? "prepare" : lobby.phase === "racing" && lobby.players.some(player => player.individualRecall) ? "recall" : "none";
-    const signalEvent = lobby.phase === "countdown" ? ((lobby.secondsLeft ?? 0) <= 60 ? "minute" : signal === "prepare" ? "prepare" : "countdown") : lobby.phase;
-    if (this.lastSignal && signalEvent !== this.lastSignal && signalEvent !== "waiting") this.playSignal();
-    this.lastSignal = signalEvent;
     this.laserFlag?.setEnabled(lobby.phase === "countdown");
     if (signal !== this.signalKey && this.signalTexture && this.signalFlag) {
       this.signalKey = signal; this.signalFlag.setEnabled(signal !== "none");
@@ -286,8 +267,8 @@ export class RaceScene {
     const countdown = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}`;
     const header = lobby.phase === "waiting" ? "Ожидание участников" : lobby.phase === "countdown" ? `До старта ${countdown}` : "Старт дан";
     const standings = lobby.players.map((player, index) => {
-      const result = player.elapsed === null ? (player.phase === "retired" ? "сошёл" : player.individualRecall ? "индивидуальный отзыв" : player.phase === "start" ? "перед стартом" : "на дистанции") : `финиш ${player.elapsed.toFixed(1)} с`;
-      return `${player.elapsed === null ? "–" : `${index + 1}.`} ${player.name}${player.id === lobby.hostId ? " ★" : ""} — ${result}`;
+      const result = player.elapsed === null ? (player.individualRecall ? "индивидуальный отзыв" : player.phase === "start" ? "перед стартом" : "на дистанции") : `финиш ${player.elapsed.toFixed(1)} с`;
+      return `${index + 1}. ${player.name}${player.id === lobby.hostId ? " ★" : ""} — ${result}`;
     });
     const signalText = lobby.phase === "countdown" ? `Флаг Laser${signal === "prepare" ? " · флаг P" : ""}` : signal === "recall" ? "Флаг X: индивидуальный отзыв" : "";
     this.startButton.textContent = `Начать отсчёт · ${lobby.countdownSeconds} с`;
@@ -297,8 +278,6 @@ export class RaceScene {
   }
   private renderProgress(): void {
     const state=this.progress;if(!state)return;
-    if (state.phase === "completed" && this.lastRacePhase && this.lastRacePhase !== "completed") this.playSignal();
-    this.lastRacePhase = state.phase;
     this.setCourseLines(state.startLine, state.finishLine);
     for (let i = this.marks.length; i < state.marks.length; i++) {
       const mark = MeshBuilder.CreateCylinder(`race-mark-${i}`, {height:2.2, diameterTop:0.7, diameterBottom:1.8, tessellation:12}, this.scene);
@@ -345,30 +324,13 @@ export class RaceScene {
         : state.individualRecall
           ? "Индивидуальный отзыв! Вернитесь всем корпусом на предстартовую сторону и стартуйте заново."
           : `${labels[state.phase]} · ${state.elapsed.toFixed(1)} с`;
-    this.hint.textContent = this.lobby?.phase === "waiting" ? "Подсказка: создатель комнаты запускает отсчёт, остальные ожидают." :
-      this.lobby?.phase === "countdown" ? "Подсказка: линия старта между S и судейским судном. Держитесь с предстартовой стороны до сигнала." :
-      state.individualRecall ? "Подсказка: вернитесь целиком за линию старта, затем снова пересеките её в сторону знака 1." :
-      state.phase === "start" ? "Подсказка: пройдите между S и судейским судном к знаку 1; через линию финиша старт не засчитается." :
-      state.phase === "marks" ? (state.roundingWarning ? `Знак ${state.nextMark + 1} пройден через ворота в обратном направлении. Вернитесь и обогните его, оставляя слева.` : `Подсказка: идите к подсвеченному знаку ${state.nextMark + 1}. Оставьте его слева и пересеките жёлтые ворота; слишком широкий проход не засчитается.`) :
-      state.phase === "finish" ? "Подсказка: пересеките линию между судейским судном и F со стороны последнего знака." : "Подсказка: ваш результат показан в списке участников.";
-    if (state.penaltyTurns > 0) {
-      this.hint.textContent = `Штраф: ${state.penaltyReason}. Осталось оборотов: ${state.penaltyTurns}. Отойдите от других лодок и выполните полный поворот в одном направлении через ветер и фордевинд. Прогресс: ${Math.round(state.penaltyProgress * 100)}%. До выполнения штрафа финиш не засчитывается.`;
-    }
     this.marks.forEach((mesh,index)=>{ const mat=mesh.material as StandardMaterial; mat.emissiveColor=state.phase==="marks" && index===state.nextMark ? new Color3(0.65,0.35,0.05) : Color3.Black(); });
-  }
-  private playSignal(): void {
-    if (!this.audio || this.audio.state !== "running") return;
-    const oscillator = this.audio.createOscillator(), gain = this.audio.createGain();
-    oscillator.type = "sine"; oscillator.frequency.value = 660; gain.gain.setValueAtTime(0.12, this.audio.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.audio.currentTime + 0.4);
-    oscillator.connect(gain); gain.connect(this.audio.destination); oscillator.start(); oscillator.stop(this.audio.currentTime + 0.4);
   }
   private readonly onDown=(event:KeyboardEvent):void=>{if(["KeyA","KeyD","ArrowLeft","ArrowRight","KeyQ","KeyE"].includes(event.code)){event.preventDefault();this.keys.add(event.code);}};
   private readonly onUp=(event:KeyboardEvent):void=>{this.keys.delete(event.code);};
   private readonly onBlur=():void=>{this.keys.clear();};
   public dispose():void {
     if(this.disposed)return;this.disposed=true;
-    if (this.audio) void this.audio.close();
     window.removeEventListener("keydown",this.onDown);window.removeEventListener("keyup",this.onUp);window.removeEventListener("blur",this.onBlur);
     this.unsubscribers.forEach(fn=>fn());this.hud.remove();this.boat.dispose();this.water.dispose();
     for (const remote of this.remote.values()) { remote.boat.dispose(); remote.anchor.dispose(); }
