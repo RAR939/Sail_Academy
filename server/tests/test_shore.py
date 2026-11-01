@@ -32,7 +32,12 @@ def game(tmp_path, monkeypatch):
             yield session
 
     def unavailable(messages):
-        raise OSError("No model installed")
+        return "Румпель управляет рулём."
+
+    async def retrieve(*args):
+        return [], {}
+
+    monkeypatch.setattr(service, "retrieve", retrieve)
 
     monkeypatch.setattr(main, "init_db", init)
     monkeypatch.setattr(main, "close_db", engine.dispose)
@@ -108,20 +113,15 @@ def test_serves_built_client_and_local_models(game):
         assert client.get("/assets/glb/props/Textures/colormap.png").status_code == 200
 
 
-def test_fallback_and_personal_memory(game):
+def test_unavailable_does_not_advance_or_save_memory(game, monkeypatch):
     client, player = game
-    first = talk(client, player, "sailor")
-    assert first["backend"] == "fallback"
-    assert "швартов" in first["text"].lower()
-    second = talk(client, player, "sailor")
-    assert "уже это обсуждали" in second["text"]
-    # Another user's memory and scenario are independent.
-    credentials = {"username": "another_tester", "password": "test-only-password"}
-    user_id = client.post("/api/auth/register", json=credentials).json()["id"]
-    client.headers["Authorization"] = "Bearer " + client.post("/api/auth/login", json=credentials).json()["access_token"]
-    other = PlayerState(user_id=user_id, username="another_tester")
-    room_manager.add_player(other, "hub")
-    assert "уже это обсуждали" not in talk(client, other, "sailor")["text"]
+    def unavailable(messages):
+        raise OSError("No model installed")
+    monkeypatch.setattr(service, "generate_local", unavailable)
+    player.x, player.z = shore.NPCS["captain"]["position"]
+    response = client.post("/api/ai/dialog", json={"npc_id": "captain", "text": "Привет"})
+    assert response.status_code == 503
+    assert client.get("/api/story").json()["step"] == "meet_captain"
 
 
 def test_ollama_connector_and_context(game, monkeypatch):
@@ -196,3 +196,23 @@ def test_admin_player_list_and_selective_rights(game, tmp_path, monkeypatch):
     assert client.put(f"/api/admin/players/{player.user_id}/rights", json={"admin": False}).status_code == 400
     assert client.put(f"/api/admin/players/{other_id}/rights", json={"admin": False}).status_code == 200
     assert access.admin_ids() == {player.user_id}
+
+
+def test_memory_isolated_by_user_and_npc(game, monkeypatch):
+    client, player = game
+    captured = []
+    def generate(messages):
+        captured.append(messages)
+        return 'Ответ наставника.'
+    monkeypatch.setattr(service, 'generate_local', generate)
+    player.x, player.z = shore.NPCS['sailor']['position']
+    assert client.post('/api/ai/dialog', json={'npc_id': 'sailor', 'text': 'Мой особый вопрос'}).status_code == 200
+    talk(client, player, 'judge')
+    assert not any(m.get('content') == 'Мой особый вопрос' for m in captured[-1])
+    credentials = {'username': 'another_tester', 'password': 'test-only-password'}
+    user_id = client.post('/api/auth/register', json=credentials).json()['id']
+    client.headers['Authorization'] = 'Bearer ' + client.post('/api/auth/login', json=credentials).json()['access_token']
+    other = PlayerState(user_id=user_id, username='another_tester')
+    room_manager.add_player(other, 'hub')
+    talk(client, other, 'sailor')
+    assert not any(m.get('content') == 'Мой особый вопрос' for m in captured[-1])
