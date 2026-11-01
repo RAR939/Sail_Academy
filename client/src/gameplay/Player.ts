@@ -24,6 +24,10 @@ export interface PlayerConfig {
   spawn: Vector3;
   walkSpeed?: number;
   runSpeed?: number;
+  acceleration?: number;
+  braking?: number;
+  gravity?: number;
+  turnSpeed?: number;
   capsuleHeight?: number;
   capsuleRadius?: number;
 }
@@ -48,7 +52,10 @@ export class Player {
 
   private readonly walkSpeed: number;
   private readonly runSpeed: number;
-  private readonly gravity = -24;
+  private readonly gravity: number;
+  private readonly acceleration: number;
+  private readonly braking: number;
+  private readonly turnSpeed: number;
   private readonly animationGroups = new Map<PlayerAnimation, AnimationGroup>();
 
   private input: PlayerInput = {
@@ -59,6 +66,8 @@ export class Player {
   };
 
   private verticalVelocity = 0;
+  private readonly horizontalVelocity = Vector3.Zero();
+  private readonly actualMovement = Vector3.Zero();
   private currentAnimation: PlayerAnimation = "idle";
   private interactionRequested = false;
   private interactionWasPressed = false;
@@ -69,6 +78,10 @@ export class Player {
     this.id = config.id;
     this.walkSpeed = config.walkSpeed ?? 3.3;
     this.runSpeed = config.runSpeed ?? 6.2;
+    this.gravity = config.gravity ?? -24;
+    this.acceleration = config.acceleration ?? 22;
+    this.braking = config.braking ?? 85;
+    this.turnSpeed = config.turnSpeed ?? 14;
 
     const height = config.capsuleHeight ?? 1.8;
     const radius = config.capsuleRadius ?? 0.38;
@@ -121,6 +134,7 @@ export class Player {
     const delta = Scalar.Clamp(deltaSeconds, 0, 0.05);
 
     if (this.interactionTimeLeft > 0) {
+      this.actualMovement.setAll(0);
       this.interactionTimeLeft -= delta;
       if (this.interactionTimeLeft <= 0) {
         this.setAnimation("idle");
@@ -135,17 +149,20 @@ export class Player {
       direction.normalize();
 
       const targetYaw = Math.atan2(direction.x, direction.z);
-      this.collider.rotation.y = Scalar.LerpAngle(
-        this.collider.rotation.y,
-        targetYaw,
-        Math.min(1, delta * 14),
+      const difference = Math.atan2(
+        Math.sin(targetYaw - this.collider.rotation.y),
+        Math.cos(targetYaw - this.collider.rotation.y),
       );
+      this.collider.rotation.y += difference * (1 - Math.exp(-this.turnSpeed * delta));
     }
 
     const speed = this.input.run ? this.runSpeed : this.walkSpeed;
-    const horizontalMovement = hasMovement
-      ? direction.scale(speed * delta)
-      : Vector3.Zero();
+    const desiredVelocity = hasMovement ? direction.scale(speed) : Vector3.Zero();
+    const change = desiredVelocity.subtract(this.horizontalVelocity);
+    const maxChange = (hasMovement ? this.acceleration : this.braking) * delta;
+    if (change.lengthSquared() > maxChange * maxChange) change.normalize().scaleInPlace(maxChange);
+    this.horizontalVelocity.addInPlace(change);
+    const horizontalMovement = this.horizontalVelocity.scale(delta);
 
     this.verticalVelocity += this.gravity * delta;
 
@@ -155,9 +172,11 @@ export class Player {
       horizontalMovement.z,
     );
 
-    const yBeforeMove = this.collider.position.y;
+    const beforeMove = this.collider.position.clone();
     this.collider.moveWithCollisions(movement);
-    const actualVerticalMove = this.collider.position.y - yBeforeMove;
+    const actualVerticalMove = this.collider.position.y - beforeMove.y;
+    this.actualMovement.set(this.collider.position.x - beforeMove.x, 0, this.collider.position.z - beforeMove.z);
+    if (delta > 0) this.actualMovement.scaleInPlace(1 / delta);
 
     // Если падение было остановлено поверхностью, сбрасываем скорость вниз.
     if (
@@ -167,10 +186,11 @@ export class Player {
       this.verticalVelocity = 0;
     }
 
-    if (!hasMovement) {
+    const movingSpeed = this.horizontalVelocity.length();
+    if (movingSpeed < 0.1) {
       this.setAnimation("idle");
     } else {
-      this.setAnimation(this.input.run ? "run" : "walk");
+      this.setAnimation(this.input.run && movingSpeed > this.walkSpeed * 0.95 ? "run" : "walk");
     }
   }
 
@@ -182,13 +202,19 @@ export class Player {
 
   public playInteraction(durationSeconds = 0.65): void {
     this.interactionTimeLeft = durationSeconds;
+    this.horizontalVelocity.setAll(0);
+    this.actualMovement.setAll(0);
     this.setAnimation("interact");
   }
 
   public setPosition(position: Vector3): void {
     this.collider.position.copyFrom(position);
     this.verticalVelocity = 0;
+    this.horizontalVelocity.setAll(0);
+    this.actualMovement.setAll(0);
   }
+
+  public get movementDirection(): Vector3 { return this.actualMovement; }
 
   public getSnapshot(): PlayerSnapshot {
     return {
@@ -241,6 +267,7 @@ export class Player {
       group.start(next !== "interact", 1);
     }
   }
+  public get speed(): number { return this.horizontalVelocity.length(); }
   public get isMoving(): boolean {
     return (
             this.interactionTimeLeft <= 0 &&

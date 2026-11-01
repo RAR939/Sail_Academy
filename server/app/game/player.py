@@ -1,4 +1,4 @@
-﻿from dataclasses import dataclass, field
+from dataclasses import dataclass, field
 import time
 
 
@@ -6,6 +6,8 @@ import time
 class PlayerState:
     user_id: int
     username: str
+
+    skin: str = "skaterMaleA"
 
     x: float = 0.0
     y: float = 0.0
@@ -38,6 +40,7 @@ class PlayerState:
         return {
             "id": self.user_id,
             "username": self.username,
+            "skin": self.skin,
             "x": self.x,
             "y": self.y,
             "z": self.z,

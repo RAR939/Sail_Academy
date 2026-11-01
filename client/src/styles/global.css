@@ -13,7 +13,7 @@ body {
 
 .shore-hud, .npc-chat, .shore-notice { font-family: Arial, sans-serif; box-sizing: border-box; color: #f2eee1; }
 .shore-hud[hidden], .npc-chat[hidden], .shore-notice[hidden] { display: none; }
-.shore-hud { position: fixed; top: 22px; left: 22px; z-index: 10; width: min(340px, calc(100vw - 44px)); padding: 22px; background: #142e39ed; border: 1px solid #ffffff25; border-radius: 12px; box-shadow: 0 10px 40px #10253133; pointer-events: none; }
+.shore-hud { position: fixed; top: 22px; left: 22px; z-index: 10; width: min(340px, calc(100vw - 44px)); padding: 22px; background: rgba(15, 42, 52, 0.78); border: 1px solid #d6ebe348; border-radius: 16px; box-shadow: 0 12px 36px #1025313d; backdrop-filter: blur(12px); pointer-events: none; }
 .shore-eyebrow { font-size: 10px; letter-spacing: 0.13em; color: #a7c3c6; margin-bottom: 22px; }
 .shore-counter { color: #e9bf7d; font-size: 11px; letter-spacing: 0.08em; }
 .shore-hud h2 { font-size: 22px; line-height: 1.15; margin: 10px 0; }
@@ -21,8 +21,8 @@ body {
 .shore-hud .shore-distance { font-size: 12px; color: #e9bf7d; }
 .shore-equipment { display: block; padding: 12px 0; font-size: 12px; color: #a8d3bd; border-top: 1px solid #ffffff20; margin-top: 16px; }
 .shore-hud .shore-help { font-size: 11px; color: #abc0c8; white-space: pre-line; margin-bottom: 0; }
-.shore-notice { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 25; width: min(650px, calc(100vw - 40px)); padding: 18px 22px; background: #163440f5; border: 1px solid #e9bf7d66; border-radius: 10px; line-height: 1.5; font-size: 14px; }
-.npc-chat { position: fixed; right: 24px; bottom: 24px; z-index: 30; width: min(620px, calc(100vw - 48px)); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; padding: 24px; border: 1px solid #b5cfca55; border-radius: 14px; background: #112b36fa; box-shadow: 0 20px 70px #0006; }
+.shore-notice { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 25; width: min(650px, calc(100vw - 40px)); padding: 18px 22px; background: rgba(15, 42, 52, 0.82); border: 1px solid #e9bf7d66; border-radius: 14px; backdrop-filter: blur(12px); line-height: 1.5; font-size: 14px; }
+.npc-chat { position: fixed; right: 24px; bottom: 24px; z-index: 30; width: min(620px, calc(100vw - 48px)); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; padding: 24px; border: 1px solid #b5cfca55; border-radius: 16px; background: rgba(17, 43, 54, 0.91); backdrop-filter: blur(14px); box-shadow: 0 20px 70px #0006; }
 .npc-chat header { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
 .npc-chat h2 { font-size: 22px; margin: 0; }
 .npc-chat > p { margin: 8px 0 16px; color: #b5cbd0; font-size: 13px; }
@@ -63,8 +63,11 @@ body {
   max-width: min(680px, 90vw);
   padding: 10px 16px;
   transform: translateX(-50%);
-  border-radius: 8px;
-  background: rgb(0 0 0 / 68%);
+  border: 1px solid rgb(199 226 218 / 32%);
+  border-radius: 12px;
+  background: rgb(13 38 48 / 78%);
+  box-shadow: 0 8px 24px rgb(9 28 35 / 24%);
+  backdrop-filter: blur(10px);
   color: #fff;
   font-family: Arial, sans-serif;
   text-align: center;
@@ -275,3 +278,6 @@ body {
 .race-wind-arrow { display:inline-block; color:#f1c880; font-size:30px; line-height:1; transform-origin:center; }
 .race-hud { pointer-events: auto; }
 .race-hud button:disabled { opacity: .6; cursor: wait; }
+
+.admin-entry { position: fixed; z-index: 12; top: 22px; right: 22px; padding: 10px 14px; border: 1px solid #b5cfca77; border-radius: 10px; background: #112b36dd; color: #f6ecd8; cursor: pointer; font: 600 13px system-ui, sans-serif; }
+.admin-entry[hidden] { display: none; }

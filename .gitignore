@@ -1,2 +1,28 @@
-﻿server/certs/
+# Python environments and caches
+.venv/
+.venv-*/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# JavaScript dependencies and generated builds
+node_modules/
+dist/
+
+# Local settings, data, and private keys
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+*.sqlite3
+server/certs/
 **/lan-key.pem
+/shared/world/backups/
+/server/data/admins.json
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

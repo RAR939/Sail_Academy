@@ -1,7 +1,7 @@
 {
   "version": 1,
   "kind": "asset_inventory_not_runtime_budget",
-  "file_bytes_total": 2215682,
+  "file_bytes_total": 2615138,
   "limitations": [
     "Includes all GLB-directory resources, including assets not instantiated in the hub.",
     "Excludes procedural meshes and dynamic textures.",
@@ -21,6 +21,14 @@
       "url": "/assets/glb/characters/character.glb",
       "file_bytes": 95720,
       "sha256": "f4e11e68ecf5181d103dddadf2dce801203b672c397c927dbe10601998eaa8cd",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 75480,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/characters/protagonist.glb",
+      "file_bytes": 399456,
+      "sha256": "ffb68827a8f7b719279fa64f5bc850779e1b94b46cc6ca608063c19302bc882f",
       "mesh_count": 1,
       "referenced_accessor_bytes": 75480,
       "external_uris": []

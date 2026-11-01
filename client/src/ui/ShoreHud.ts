@@ -22,7 +22,7 @@ export class ShoreHud {
     this.distance.className = "shore-distance";
     const help = document.createElement("p");
     help.className = "shore-help";
-    help.textContent = "WASD — идти · Shift — бег · E — взаимодействовать\nПКМ + мышь — камера · Колесо — масштаб";
+    help.textContent = "WASD — идти · Shift — бег · E — взаимодействовать\nКлик + мышь — камера · Esc — курсор\nПКМ + мышь — обзор · Колесо — масштаб";
     this.notice.className = "shore-notice";
     this.notice.hidden = true;
     this.notice.setAttribute("role", "status");

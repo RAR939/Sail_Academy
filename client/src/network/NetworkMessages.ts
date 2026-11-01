@@ -9,6 +9,7 @@ export type PlayerAnimation = "idle" | "walk" | "run" | "interact" | string;
 export interface PlayerStateMessage {
   id: number;
   username: string;
+  skin?: string;
   x: number;
   y: number;
   z: number;
@@ -28,6 +29,7 @@ export interface BoatStateMessage {
 export interface AuthMessage {
   t: "auth";
   token: string;
+  skin?: string;
 }
 
 export interface PingMessage {

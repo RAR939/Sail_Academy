@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import logging
 import math
 import time
@@ -17,6 +17,7 @@ from app.game.boat import BoatState
 from app.game.room_manager import room_manager
 
 from app.websocket.manager import manager
+from app.admin import world as world_config
 
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ def validate_player_movement(
     horizontal_distance = math.sqrt(dx * dx + dz * dz)
     vertical_distance = abs(dy)
 
-    max_horizontal = PLAYER_MAX_SPEED * elapsed + MOVEMENT_TOLERANCE
+    max_horizontal = world_config.read()[0].player.runSpeed * elapsed + MOVEMENT_TOLERANCE
     max_vertical = PLAYER_MAX_VERTICAL_SPEED * elapsed + MOVEMENT_TOLERANCE
 
     return (
@@ -199,10 +200,16 @@ async def game_websocket(websocket: WebSocket):
 
             username = user.username
 
+        skin = auth_message.get("skin", "skaterMaleA")
+        if skin not in ("skaterMaleA", "skaterFemaleA", "criminalMaleA", "cyborgFemaleA"):
+            await websocket.close(code=1008, reason="Invalid skin")
+            return
+
         # Создаём персонажа и лодку.
         player = PlayerState(
             user_id=user_id,
-            username=username
+            username=username,
+            skin=skin
         )
 
         boat = BoatState(

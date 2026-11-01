@@ -1,5 +1,6 @@
 import {
   AbstractMesh,
+  AnimationGroup,
   AssetContainer,
   LoadAssetContainerAsync,
   Scene,
@@ -19,6 +20,7 @@ export interface SpawnAssetOptions {
 
 export interface SpawnedAsset {
   roots: TransformNode[];
+  animations: AnimationGroup[];
   dispose(): void;
 }
 
@@ -85,6 +87,7 @@ export class AssetLoader {
 
     return {
       roots,
+      animations: entries.animationGroups,
       dispose: () => entries.dispose(),
     };
   }

@@ -1,4 +1,4 @@
-import { Scene, StandardMaterial, Color3, MeshBuilder, Mesh } from "@babylonjs/core";
+import { Scene, StandardMaterial, Material, Color3, MeshBuilder, Mesh } from "@babylonjs/core";
 import { CameraRig } from "../gameplay/CameraRig";
 import { InteractionSystem } from "../gameplay/InteractionSystem";
 import { Player } from "../gameplay/Player";
@@ -11,8 +11,11 @@ import { ShoreApi, type ShoreStory } from "../network/ShoreApi";
 import { NpcChat } from "../ui/NpcChat";
 import { BoatLesson } from "../ui/BoatLesson";
 import { ShoreHud } from "../ui/ShoreHud";
-import { ShoreEnvironment, SHORE_NPCS } from "../world/ShoreEnvironment";
-import { Vector3 } from "@babylonjs/core";
+import { ShoreEnvironment } from "../world/ShoreEnvironment";
+import type { WorldConfig } from "../world/WorldConfig";
+import { Character } from "../rendering/Character";
+import { createPropCollider } from "../rendering/PropCollisions";
+import { TransformNode, Vector3 } from "@babylonjs/core";
 
 export class HubScene {
   private readonly player: Player;
@@ -28,8 +31,12 @@ export class HubScene {
   private readonly assets: SpawnedAsset[] = [];
   private readonly hint = document.createElement("div");
   private readonly remotePlayers = new Map<number, RemotePlayer>();
+  private lastPlayers: PlayerStateMessage[] = [];
+  private readonly npcCharacters: Character[] = [];
   private readonly unsubscribers: Array<() => void> = [];
   private readonly vest: Mesh;
+  private localCharacter: Character | null = null;
+  private localUsername = "";
   private localUserId: number | null = null;
   private sendAccumulator = 0;
   private connected = false;
@@ -39,15 +46,16 @@ export class HubScene {
   private disposed = false;
   private sessionVersion = 0;
 
-  public constructor(private readonly scene: Scene, canvas: HTMLCanvasElement, private readonly network: NetworkClient) {
-    this.environment = new ShoreEnvironment(scene);
+  public constructor(private readonly scene: Scene, canvas: HTMLCanvasElement, private readonly network: NetworkClient, private readonly world: WorldConfig) {
+    this.environment = new ShoreEnvironment(scene, world);
     this.boatLesson = new BoatLesson(scene, this.environment.dinghy, () => {
       if (this.network.isConnected) this.network.createRace();
     });
-    this.player = new Player(scene, { id: "local-player", spawn: new Vector3(0, 1.1, 0), runSpeed: 4 });
+    this.player = new Player(scene, { id: "local-player", spawn: new Vector3(0, 1.1, 0), ...world.player });
     this.cameraRig = new CameraRig(scene, canvas, {
-      alpha: Math.PI / 2, beta: 0.85, radius: 12,
-      minRadius: 4, maxRadius: 18, targetHeight: 0.35,
+      alpha: -Math.PI / 2, beta: world.camera.beta, radius: world.camera.distance,
+      minRadius: world.camera.minDistance, maxRadius: world.camera.maxDistance,
+      targetHeight: world.camera.height, followSpeed: world.camera.followSpeed, manualDelay: world.camera.manualDelay,
     });
     this.cameraRig.setTarget(this.player.collider);
     scene.activeCamera = this.cameraRig.camera;
@@ -67,7 +75,7 @@ export class HubScene {
     this.input.setEnabled(false);
     this.cameraRig.setEnabled(false);
 
-    for (const npc of SHORE_NPCS) {
+    for (const npc of world.npcs) {
       const station = this.environment.stations.get(npc.id)!;
       this.interactions.register({
         id: npc.id, kind: "npc", anchor: station.anchor,
@@ -118,8 +126,12 @@ export class HubScene {
     this.unsubscribers.push(
       network.on("welcome", (message) => {
         this.localUserId = message.user_id;
+        this.localUsername = message.username;
         const own = message.players.find((state) => state.id === message.user_id);
-        if (own) this.player.setPosition(new Vector3(own.x, own.y + 1.1, own.z));
+        if (own) {
+          this.player.setPosition(new Vector3(own.x, own.y + 1.1, own.z));
+          this.cameraRig.snapToTarget();
+        }
         this.applySnapshot(message.players);
       }),
       network.on("players", (message) => this.applySnapshot(message.delta)),
@@ -141,10 +153,33 @@ export class HubScene {
       }),
     );
     void this.loadScenery();
+    void this.loadNpcCharacters();
   }
 
-  public async enter(baseUrl: string, token: string): Promise<void> {
+  public get canApplyWorld(): boolean { return !this.chat.isOpen && !this.boatLesson.isOpen && !this.busy; }
+
+  public captureSession(): { userId: number | null; username: string; position: Vector3; yaw: number; cameraAlpha: number; cameraBeta: number; players: PlayerStateMessage[] } {
+    return { userId: this.localUserId, username: this.localUsername, position: this.player.collider.position.clone(), yaw: this.player.collider.rotation.y, cameraAlpha: this.cameraRig.camera.alpha, cameraBeta: this.cameraRig.camera.beta, players: this.lastPlayers };
+  }
+
+  public restoreSession(state: ReturnType<HubScene["captureSession"]>): void {
+    this.localUserId = state.userId;
+    this.localUsername = state.username;
+    this.player.setPosition(state.position);
+    this.player.collider.rotation.y = state.yaw;
+    this.cameraRig.camera.alpha = state.cameraAlpha;
+    this.cameraRig.camera.beta = state.cameraBeta;
+    this.cameraRig.snapToTarget();
+    this.applySnapshot(state.players);
+  }
+
+  public async enter(baseUrl: string, token: string, skin: string): Promise<void> {
     const version = ++this.sessionVersion;
+    this.localCharacter?.dispose();
+    this.localCharacter = new Character(this.scene, this.assetLoader, this.player.collider, this.localUsername);
+    await this.localCharacter.load(skin);
+    if (this.disposed || !this.connected || version !== this.sessionVersion) return;
+    this.player.visual.setEnabled(false);
     this.api.configure(baseUrl, token);
     const story = await this.api.story();
     if (this.disposed || !this.connected || version !== this.sessionVersion) return;
@@ -157,12 +192,12 @@ export class HubScene {
 
   public update(delta: number): void {
     if (!this.active) return;
-    this.environment.update(delta);
     if (this.ready) {
       const input = this.input.getPlayerInput(this.cameraRig);
       this.player.setInput(input);
       this.player.update(delta);
-      this.cameraRig.update(delta, input.moveX !== 0 || input.moveZ !== 0);
+      this.localCharacter?.animate(this.player.getSnapshot().animation);
+      this.cameraRig.update(delta, input.run && this.player.speed > this.world.player.walkSpeed * 0.95, this.player.movementDirection);
       if (!this.chat.isOpen && !this.boatLesson.isOpen && !this.busy) this.interactions.update(this.player);
       const target = this.interactions.current;
       this.hint.textContent = target?.prompt ?? "";
@@ -175,6 +210,13 @@ export class HubScene {
       }
     }
     for (const remote of this.remotePlayers.values()) remote.update(performance.now());
+    const nearbyPlayers = this.ready
+      ? [
+          { id: this.localUserId ?? -1, position: this.player.collider.position },
+          ...Array.from(this.remotePlayers, ([id, remote]) => ({ id, position: remote.position })),
+        ]
+      : [];
+    this.environment.update(delta, nearbyPlayers);
   }
 
   public setActive(active: boolean): void {
@@ -199,13 +241,14 @@ export class HubScene {
   }
 
   private applySnapshot(players: PlayerStateMessage[]): void {
+    this.lastPlayers = players.map((state) => ({ ...state }));
     const present = new Set<number>();
     for (const state of players) {
       if (state.id === this.localUserId) continue;
       present.add(state.id);
       const remote = this.remotePlayers.get(state.id);
       if (remote) remote.pushSnapshot(state);
-      else this.remotePlayers.set(state.id, new RemotePlayer(this.scene, state));
+      else this.remotePlayers.set(state.id, new RemotePlayer(this.scene, state, this.assetLoader));
     }
     for (const [id, remote] of this.remotePlayers) {
       if (!present.has(id)) { remote.dispose(); this.remotePlayers.delete(id); }
@@ -217,19 +260,31 @@ export class HubScene {
     this.remotePlayers.clear();
   }
 
+  private async loadNpcCharacters(): Promise<void> {
+    await Promise.all(this.world.npcs.map(async (npc) => {
+      const station = this.environment.stations.get(npc.id)!;
+      const anchor = new TransformNode(`npc-visual-${npc.id}`, this.scene);
+      anchor.parent = station.anchor;
+      anchor.position.y = 0.9;
+      const character = new Character(this.scene, this.assetLoader, anchor, npc.name, npc.role);
+      this.npcCharacters.push(character);
+      try {
+        await character.load(npc.skin);
+        if (this.disposed) return;
+        const meshes = character.getMeshes();
+        if (!meshes.length) throw new Error("Модель NPC не содержит мешей");
+        station.meshes.forEach((mesh) => mesh.dispose());
+        station.meshes = meshes;
+      } catch (error) {
+        console.warn("Не удалось загрузить модель NPC", npc.id, error);
+        character.dispose();
+        anchor.dispose();
+      }
+    }));
+  }
+
   private async loadScenery(): Promise<void> {
-    const placements: Array<[string, number, number, number]> = [
-      ["environment/tree_palm_tall", -23, -7, 1.6],
-      ["environment/tree_palm_tall", 27, -8, 1.8],
-      ["environment/tree_palm_bend", -25, 17, 1.6],
-      ["environment/tree_palm_tall", 30, 22, 1.7],
-      ["environment/bush_large", -20, 23, 1.5],
-      ["environment/bush_large", 25, 18, 1.3],
-      ["environment/rock_large_a", -30, -9, 1.8],
-      ["environment/rock_small_a", 32, -10, 1.7],
-      ["props/crate", 18, 1, 1],
-      ["props/crate", 19, 2, 0.8],
-    ];
+    const placements = this.world.props;
     await Promise.all(placements.map(async ([path, x, z, size], index) => {
       try {
         const asset = await this.assetLoader.spawn(`/assets/glb/${path}.glb`, {
@@ -238,6 +293,17 @@ export class HubScene {
         });
         if (this.disposed) { asset.dispose(); return; }
         this.assets.push(asset);
+        // Kenney foliage and props contain open faces; keep the opaque faces
+        // visible from both sides rather than showing holes from behind.
+        for (const root of asset.roots) for (const mesh of root.getChildMeshes()) {
+          if (mesh.material) {
+            mesh.material.backFaceCulling = false;
+            mesh.material.transparencyMode = Material.MATERIAL_OPAQUE;
+            mesh.material.alpha = 1;
+          }
+        }
+        const collider = createPropCollider(this.scene, asset, this.environment.root, path, x, z, size);
+        if (!collider) console.warn("Не удалось построить коллизию декорации", path);
         for (const root of asset.roots) { root.freezeWorldMatrix(); root.getChildMeshes().forEach((mesh) => mesh.freezeWorldMatrix()); }
       } catch (error) { console.warn("Не удалось загрузить декорацию", path, error); }
     }));
@@ -252,6 +318,8 @@ export class HubScene {
     this.hud.dispose();
     this.hint.remove();
     this.clearRemotePlayers();
+    this.localCharacter?.dispose();
+    this.npcCharacters.forEach((character) => character.dispose());
     this.assets.forEach((asset) => asset.dispose());
     this.assetLoader.dispose();
     this.interactions.dispose();

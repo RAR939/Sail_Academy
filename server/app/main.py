@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import logging
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.api.auth import router as auth_router
 from app.api.shore import router as shore_router
+from app.api.admin import router as admin_router
 from app.database.connection import init_db, close_db
 from app.websocket.router import router as websocket_router
 from app.game.game_loop import game_loop
@@ -73,6 +74,7 @@ app.add_middleware(
 )
 app.include_router(auth_router)
 app.include_router(shore_router)
+app.include_router(admin_router)
 app.include_router(websocket_router)
 
 
