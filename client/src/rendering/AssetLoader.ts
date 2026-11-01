@@ -26,6 +26,8 @@ export interface SpawnedAsset {
 
 export class AssetLoader {
   private readonly templates = new Map<string, Promise<AssetContainer>>();
+  private readonly references = new Map<string, number>();
+  private closed = false;
 
   public constructor(private readonly scene: Scene) {}
 
@@ -56,12 +58,18 @@ export class AssetLoader {
     url: string,
     options: SpawnAssetOptions,
   ): Promise<SpawnedAsset> {
-    const template = await this.load(url);
+    if (this.closed) throw new Error("Asset loader disposed");
+    this.references.set(url, (this.references.get(url) ?? 0) + 1);
+    let template: AssetContainer;
+    try { template = await this.load(url); }
+    catch (error) { this.release(url); throw error; }
+    if (this.closed) { this.release(url); throw new Error("Asset loader disposed"); }
 
-    const entries = template.instantiateModelsToScene(
+    let entries;
+    try { entries = template.instantiateModelsToScene(
       (sourceName) => `${options.name}-${sourceName}`,
       false,
-    );
+    ); } catch (error) { this.release(url); throw error; }
 
     const roots = entries.rootNodes.filter(
       (node): node is TransformNode => node instanceof TransformNode,
@@ -85,10 +93,11 @@ export class AssetLoader {
       this.setCollisions(root, options.checkCollisions ?? false);
     }
 
+    let disposed = false;
     return {
       roots,
       animations: entries.animationGroups,
-      dispose: () => entries.dispose(),
+      dispose: () => { if (disposed) return; disposed = true; entries.dispose(); this.release(url); },
     };
   }
 
@@ -97,11 +106,24 @@ export class AssetLoader {
   }
 
   public dispose(): void {
+    if (this.closed) return;
+    this.closed = true;
     for (const containerPromise of this.templates.values()) {
       void containerPromise.then((container) => container.dispose());
     }
 
     this.templates.clear();
+    this.references.clear();
+  }
+
+  private release(url: string): void {
+    const count = this.references.get(url);
+    if (count === undefined) return;
+    if (count > 1) { this.references.set(url, count - 1); return; }
+    this.references.delete(url);
+    const template = this.templates.get(url);
+    this.templates.delete(url);
+    if (template) void template.then(container => container.dispose()).catch(() => {});
   }
 
   private setCollisions(root: TransformNode, enabled: boolean): void {

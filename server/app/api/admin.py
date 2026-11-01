@@ -114,3 +114,18 @@ def backup(name: str):
     try: return {'world': world.read_backup(name).model_dump(exclude_none=True)}
     except FileNotFoundError as error: raise HTTPException(404, 'Резервная копия не найдена') from error
     except ValueError as error: raise HTTPException(409, str(error)) from error
+
+@router.get('/admin/races', dependencies=[Depends(require_admin)])
+def race_overview():
+    from app.game.race import MARKS, START_LINE, FINISH_LINE
+    return {'marks': MARKS, 'startLine': START_LINE, 'finishLine': FINISH_LINE,
+            'rooms': [room.lobby_snapshot(time.monotonic()) for room in room_manager.state.rooms.values() if room.room_type == 'race']}
+
+@router.post('/admin/races/{room_id}/start', dependencies=[Depends(require_admin)])
+def start_race_admin(room_id: str):
+    try: room = room_manager.get_room(room_id)
+    except KeyError: raise HTTPException(404, 'Комната не найдена')
+    if room.room_type != 'race' or room.race_host is None: raise HTTPException(409, 'Нет участников гонки')
+    try: room.start_countdown(room.race_host, time.monotonic())
+    except ValueError as error: raise HTTPException(409, str(error))
+    return room.lobby_snapshot(time.monotonic())

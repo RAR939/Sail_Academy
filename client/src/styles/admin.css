@@ -25,3 +25,6 @@ summary { cursor: pointer; font-weight: 600; } details p { margin: 10px 0; } tex
 @media (max-width: 800px) { .top { padding: 18px; }.workspace { height: auto; display: flex; flex-direction: column-reverse; }.preview { height: 45vh; }.preview-bar > span { display: none; }.controls { overflow: visible; }.fields { grid-template-columns: repeat(2, minmax(0,1fr)); } }
 .admin-player-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid #ffffff22; }
 .admin-player-row span { font-size:13px; overflow-wrap:anywhere; }
+.preview-bar select, .preview-bar button { pointer-events: auto; }
+#location { min-width: 200px; }
+#race-rooms { max-height: 180px; overflow-y: auto; pointer-events: auto; }

@@ -144,6 +144,7 @@ export interface RaceLobbyMessage {
 }
 
 export type ServerMessage =
+  | { t: "movement_correction"; x: number; y: number; z: number }
   | WelcomeMessage
   | PlayersMessage
   | WindMessage

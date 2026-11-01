@@ -139,6 +139,7 @@ export class HubScene {
       });
     }
     this.unsubscribers.push(
+      network.on("movement_correction", (message) => { if (this.ready && this.active) this.player.setPosition(new Vector3(message.x, message.y + 1.1, message.z)); }),
       network.on("error", (message) => { if (this.active && this.ready) this.hud.toast(message.message); }),
       network.on("welcome", (message) => {
         this.localUserId = message.user_id;
