@@ -12,6 +12,7 @@ class BoatState:
 
     heading: float = 0.0
     sail_angle: float = 0.0
+    target_heading: float = 0.0
 
     vx: float = 0.0
     vz: float = 0.0
@@ -41,4 +42,5 @@ class BoatState:
             "pos": [self.x, self.y, self.z],
             "heading": self.heading,
             "sailAngle": self.sail_angle,
+            "speed": (self.vx ** 2 + self.vz ** 2) ** 0.5,
         }

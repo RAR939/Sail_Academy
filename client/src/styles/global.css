@@ -269,3 +269,9 @@ body {
 .boat-lesson .boat-parts { display:flex; flex-wrap:wrap; gap:8px; margin: 12px 0; }
 .boat-lesson .boat-parts button[aria-pressed="true"] { background:#e9bf7d; color:#112b36; }
 .boat-lesson .boat-part-explanation { min-height:64px; padding:14px; border-radius:8px; background:#081e2780; color:#f2eee1; font-size:15px; line-height:1.5; }
+.race-hud button { margin-top: 10px; padding: 9px 12px; border: 1px solid #e9bf7d; background: transparent; color: #f6d397; cursor: pointer; border-radius: 5px; }
+.race-hud .race-controls { color: #b5cbd0; font-size: 12px; }
+.race-wind-indicator { display:flex; align-items:center; gap:12px; margin:12px 0; padding:9px 12px; border:1px solid #ffffff24; border-radius:8px; color:#cbe9ee; font-size:11px; font-weight:700; letter-spacing:.08em; }
+.race-wind-arrow { display:inline-block; color:#f1c880; font-size:30px; line-height:1; transform-origin:center; }
+.race-hud { pointer-events: auto; }
+.race-hud button:disabled { opacity: .6; cursor: wait; }

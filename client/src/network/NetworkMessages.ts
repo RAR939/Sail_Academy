@@ -22,6 +22,7 @@ export interface BoatStateMessage {
   pos: [number, number, number];
   heading: number;
   sailAngle: number;
+  speed?: number;
 }
 
 export interface AuthMessage {
@@ -110,6 +111,20 @@ export interface RaceCreatedMessage {
   roomId: string;
 }
 
+export interface RaceStateMessage {
+  t: "race_state";
+  phase: "start" | "marks" | "finish" | "completed";
+  nextMark: number;
+  elapsed: number;
+  marks: [number, number][];
+  markRadius: number;
+  startLine: [[number, number], [number, number]];
+  finishLine: [[number, number], [number, number]];
+  markSide: "port";
+  roundingGate: [number, number] | null;
+  markApproached: boolean;
+}
+
 export type ServerMessage =
   | WelcomeMessage
   | PlayersMessage
@@ -117,7 +132,8 @@ export type ServerMessage =
   | PongMessage
   | ErrorMessage
   | LocationChangedMessage
-  | RaceCreatedMessage;
+  | RaceCreatedMessage
+  | RaceStateMessage;
 
 export type ServerMessageType = ServerMessage["t"];
 

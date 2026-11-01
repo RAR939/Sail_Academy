@@ -8,7 +8,7 @@ export class BoatLesson {
   private highlighter: HighlightLayer;
   private onClose: (() => void) | null = null;
   public get isOpen(): boolean { return !this.root.hidden; }
-  constructor(scene: Scene, private boat: TrainingDinghy) {
+  constructor(scene: Scene, private boat: TrainingDinghy, private readonly startRace: () => void) {
     this.highlighter = new HighlightLayer("boat-lesson-highlight", scene);
     this.root.className="npc-chat boat-lesson";
     this.root.hidden=true;
@@ -25,7 +25,11 @@ export class BoatLesson {
       button.addEventListener("click",()=>this.select(part.id)); this.buttons.append(button);
     }
     this.text.className="boat-part-explanation"; this.text.setAttribute("aria-live","polite");
-    this.root.append(header,intro,this.buttons,this.text);
+    const raceButton = document.createElement("button");
+    raceButton.type = "button"; raceButton.className = "dialogue-button-primary";
+    raceButton.textContent = "Выйти на тренировочную трассу";
+    raceButton.addEventListener("click", () => { this.close(); this.startRace(); });
+    this.root.append(header,intro,this.buttons,this.text,raceButton);
     this.root.addEventListener("keydown",(event)=>{event.stopPropagation(); if(event.key==="Escape") this.close();});
     this.root.addEventListener("keyup",(event)=>event.stopPropagation());
     document.body.append(this.root);

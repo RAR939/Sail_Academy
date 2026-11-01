@@ -4,6 +4,7 @@ import {
   Scene,
 } from "@babylonjs/core";
 import { HubScene } from "../scenes/HubScene";
+import { RaceScene } from "../scenes/RaceScene";
 
 
 import { NetworkClient } from "../network/NetworkClient";
@@ -20,6 +21,9 @@ export class Game {
   private readonly loginOverlay: NetworkLoginOverlay;
   private hasConnectedOnce = false;
   private unsubscribeNetworkStatus: (() => void) | null = null;
+  private readonly gameSubscriptions: Array<() => void> = [];
+  private raceScene: RaceScene | null = null;
+  private userId: number | null = null;
 
   public constructor(private readonly canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, {
@@ -35,6 +39,21 @@ export class Game {
     this.loginOverlay = new NetworkLoginOverlay(this.authenticate);
     this.loginOverlay.show();
 
+    this.gameSubscriptions.push(
+      this.network.on("welcome", (message) => { this.userId = message.user_id; }),
+      this.network.on("location_changed", (message) => {
+        if (message.roomType === "race" && this.userId !== null) {
+          this.raceScene?.dispose();
+          this.hubScene.setActive(false);
+          this.raceScene = new RaceScene(this.engine, this.canvas, this.network, this.userId);
+        } else if (message.roomType === "hub") {
+          this.raceScene?.dispose();
+          this.raceScene = null;
+          this.hubScene.setActive(true);
+        }
+      }),
+    );
+
 
     this.unsubscribeNetworkStatus = this.network.onStatus((status) => {
       if (status === "connected") {
@@ -44,6 +63,9 @@ export class Game {
       }
 
       if (status === "disconnected" && this.hasConnectedOnce) {
+        this.raceScene?.dispose();
+        this.raceScene = null;
+        this.hubScene.setActive(true);
         this.loginOverlay.show();
       }
     });
@@ -53,8 +75,8 @@ export class Game {
     this.engine.runRenderLoop(() => {
       const deltaSeconds = this.engine.getDeltaTime() / 1000;
 
-      this.hubScene.update(deltaSeconds);
-      this.scene.render();
+      if (this.raceScene) this.raceScene.update(deltaSeconds);
+      else { this.hubScene.update(deltaSeconds); this.scene.render(); }
     });
 
     window.addEventListener("resize", this.resize);
@@ -63,6 +85,8 @@ export class Game {
   public dispose(): void {
     window.removeEventListener("resize", this.resize);
     this.unsubscribeNetworkStatus?.();
+    this.gameSubscriptions.forEach((unsubscribe) => unsubscribe());
+    this.raceScene?.dispose();
     this.loginOverlay.dispose();
     this.network.disconnect();
     this.hubScene.dispose();
@@ -74,6 +98,13 @@ private readonly authenticate = async (
   values: NetworkLoginValues
 ): Promise<void> => {
   const baseUrl = values.serverUrl.replace(/\/+$/, "");
+  const serverUrl = new URL(baseUrl);
+  if (!["http:", "https:"].includes(serverUrl.protocol)) {
+    throw new Error("Адрес сервера должен начинаться с http:// или https://");
+  }
+  if (window.location.protocol === "https:" && serverUrl.protocol !== "https:") {
+    throw new Error("Игра открыта по HTTPS. Укажите адрес сервера, начинающийся с https://");
+  }
 
   // Регистрация нового пользователя
   if (values.mode === "register") {

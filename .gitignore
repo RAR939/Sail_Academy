@@ -1,1 +1,2 @@
 ﻿server/certs/
+**/lan-key.pem

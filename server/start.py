@@ -1,6 +1,7 @@
 ﻿import argparse
 import socket
 import ipaddress
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -37,13 +38,17 @@ def create_certificate(ip: str, directory: Path, openssl: str | None = None):
         executable = str(git_openssl) if git_openssl.exists() else None
     if not executable:
         raise RuntimeError("OpenSSL не найден. Установите OpenSSL или Git for Windows.")
-    subprocess.run([
-        executable, "req", "-x509", "-newkey", "rsa:2048", "-sha256", "-nodes",
-        "-keyout", str(key), "-out", str(cert), "-days", "365",
-        "-subj", "/CN=Sail Academy Local", "-addext",
-        f"subjectAltName=DNS:localhost,IP:127.0.0.1,IP:{ip}",
-        "-addext", "extendedKeyUsage=serverAuth",
-    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    previous_umask = os.umask(0o077)
+    try:
+        subprocess.run([
+            executable, "req", "-x509", "-newkey", "rsa:2048", "-sha256", "-nodes",
+            "-keyout", str(key), "-out", str(cert), "-days", "365",
+            "-subj", "/CN=Sail Academy Local", "-addext",
+            f"subjectAltName=DNS:localhost,IP:127.0.0.1,IP:{ip}",
+            "-addext", "extendedKeyUsage=serverAuth",
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    finally:
+        os.umask(previous_umask)
     addresses.write_text(ip, encoding="ascii")
     return cert, key
 
@@ -60,6 +65,7 @@ def main():
     )
 
     parser.add_argument("--https", action="store_true", help="Включить HTTPS/WSS")
+    parser.add_argument("--ip", help="IPv4 сервера в локальной сети")
     parser.add_argument("--cert-dir", type=Path, default=Path(__file__).resolve().parent / "certs", help="Папка сертификата")
     args = parser.parse_args()
 
@@ -69,12 +75,19 @@ def main():
     print("       SAIL ACADEMY SERVER")
     print("=" * 40)
 
-    ip = get_local_ip() if args.lan else "127.0.0.1"
+    if args.ip and not args.lan:
+        parser.error("Параметр --ip используется вместе с --lan")
+    ip = args.ip or (get_local_ip() if args.lan else "127.0.0.1")
+    try:
+        if ipaddress.ip_address(ip).version != 4:
+            raise ValueError("Требуется IPv4")
+    except ValueError:
+        parser.error("Не удалось определить IPv4. Укажите адрес вручную: --lan --ip 192.168.1.10")
     ssl_options = {}
     if args.https:
         try:
             cert, key = create_certificate(ip, args.cert_dir)
-        except (ValueError, RuntimeError, subprocess.CalledProcessError) as error:
+        except (ValueError, RuntimeError, OSError, subprocess.CalledProcessError) as error:
             parser.error(f"Не удалось подготовить сертификат: {error}")
         ssl_options = {"ssl_certfile": str(cert), "ssl_keyfile": str(key)}
         print(f"Сертификат для установки на устройства: {cert}")

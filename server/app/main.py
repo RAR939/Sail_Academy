@@ -96,7 +96,9 @@ async def index():
             "message": "Sail Academy server is running. Client is not built yet."
         }
 
-    return FileResponse(index_file)
+    # The entry page names Vite's content-hashed assets and must be revalidated
+    # after a new client build; browsers may cache the assets themselves.
+    return FileResponse(index_file, headers={"Cache-Control": "no-cache"})
 
 
 if ASSETS_DIR.exists():

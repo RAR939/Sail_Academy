@@ -2,6 +2,7 @@
 
 import { LoadAssetContainerAsync } from "@babylonjs/core";
 import "@babylonjs/loaders/glTF";
+import { sailSideForWind } from "../gameplay/WindVisual";
 
 export const BOAT_PARTS = [
   { id: "hull", title: "Корпус и кокпит", text: "Корпус удерживает лодку на плаву. Нос находится впереди, корма — сзади. В кокпите сидит рулевой; борта помогают удерживать воду снаружи." },
@@ -21,6 +22,7 @@ export class TrainingDinghy {
   private readonly sailRig: TransformNode;
   private readonly rudderRig: TransformNode;
   private readonly board: Mesh;
+  private sailSide = 1;
   private targetSail = 0.22;
   private targetRudder = 0;
   private boardRaised = false;
@@ -55,6 +57,10 @@ export class TrainingDinghy {
     this.add("mast", this.cylinder("mast-lower", 3.05, 0.09, [0,1.9,-0.93], spar, this.root));
     this.add("mast", this.cylinder("mast-upper", 2.95, 0.06, [0,4.85,-0.93], spar, this.root));
     this.sailRig = new TransformNode("sail-and-boom", scene); this.sailRig.parent = this.root; this.sailRig.position.set(0,0,-0.93);
+    for (const mast of this.parts.get("mast") ?? []) {
+      mast.parent = this.sailRig;
+      mast.position.z += 0.93;
+    }
     const sail = new Mesh("mainsail", scene);
     const sailData = new VertexData();
     sailData.positions = [0,0.91,0, 0,5.93,0, 0,1.12,2.73, 0,3.65,1.42];
@@ -83,6 +89,12 @@ export class TrainingDinghy {
     const y = this.boardRaised ? 0.65 : 0.11;
     this.board.position.y += (y - this.board.position.y) * blend;
   }
+  /** Heading and windDirection are world angles; windDirection is where wind comes from. */
+  public setSailingState(sheetAngle: number, windDirection: number, heading: number): void {
+    // A little hysteresis prevents the boom switching sides on every snapshot.
+    this.sailSide = sailSideForWind(windDirection, heading, this.sailSide);
+    this.targetSail = Math.max(0, Math.min(Math.PI / 2, sheetAngle)) * this.sailSide;
+  }
   public dispose(): void { this.disposed = true; this.root.dispose(); this.mats.forEach((m) => m.dispose()); }
   private async loadModel(): Promise<void> {
     try {
@@ -93,7 +105,8 @@ export class TrainingDinghy {
       container.addAllToScene();
       for (const meshes of this.parts.values()) for (const mesh of meshes) mesh.isVisible = false;
       this.parts.clear();
-      this.sailRig.position.z = -0.20;
+      // The luff/boom attach around z=-0.82 in the converted Laser mesh.
+      this.sailRig.position.set(0.05, 0, -0.82);
       this.rudderRig.position.z = 2.26;
       const white = this.mat("laser-white", "#efefea");
       const canvas = this.mat("laser-sail", "#f6f4e9"); canvas.backFaceCulling = false;
@@ -102,8 +115,8 @@ export class TrainingDinghy {
       for (const mesh of loaded) {
         const id = mesh.name.split("_")[0] as BoatPart;
         mesh.material = id === "sail" ? canvas : id === "mast" || id === "boom" ? aluminium : id === "rudder" || id === "centreboard" ? black : white;
-        if (id === "sail" || id === "boom") {
-          mesh.parent = this.sailRig; mesh.position.set(0, 0, 0.20);
+        if (id === "sail" || id === "boom" || id === "mast") {
+          mesh.parent = this.sailRig; mesh.position.set(-0.05, 0, 0.82);
         } else if (id === "rudder") {
           mesh.parent = this.rudderRig; mesh.position.set(0, -0.3, -2.26);
         } else if (id === "centreboard") {

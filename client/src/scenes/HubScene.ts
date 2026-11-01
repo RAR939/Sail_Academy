@@ -34,13 +34,16 @@ export class HubScene {
   private sendAccumulator = 0;
   private connected = false;
   private ready = false;
+  private active = true;
   private busy = false;
   private disposed = false;
   private sessionVersion = 0;
 
   public constructor(private readonly scene: Scene, canvas: HTMLCanvasElement, private readonly network: NetworkClient) {
     this.environment = new ShoreEnvironment(scene);
-    this.boatLesson = new BoatLesson(scene, this.environment.dinghy);
+    this.boatLesson = new BoatLesson(scene, this.environment.dinghy, () => {
+      if (this.network.isConnected) this.network.createRace();
+    });
     this.player = new Player(scene, { id: "local-player", spawn: new Vector3(0, 1.1, 0), runSpeed: 4 });
     this.cameraRig = new CameraRig(scene, canvas, {
       alpha: Math.PI / 2, beta: 0.85, radius: 12,
@@ -153,6 +156,7 @@ export class HubScene {
   }
 
   public update(delta: number): void {
+    if (!this.active) return;
     this.environment.update(delta);
     if (this.ready) {
       const input = this.input.getPlayerInput(this.cameraRig);
@@ -171,6 +175,14 @@ export class HubScene {
       }
     }
     for (const remote of this.remotePlayers.values()) remote.update(performance.now());
+  }
+
+  public setActive(active: boolean): void {
+    this.active = active;
+    this.input.setEnabled(active && this.ready);
+    this.cameraRig.setEnabled(active && this.ready);
+    this.hud.setVisible(active && this.ready);
+    if (!active) this.hint.hidden = true;
   }
 
   private applyStory(story: ShoreStory): void {

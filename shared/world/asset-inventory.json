@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "kind": "asset_inventory_not_runtime_budget",
+  "file_bytes_total": 2215682,
+  "limitations": [
+    "Includes all GLB-directory resources, including assets not instantiated in the hub.",
+    "Excludes procedural meshes and dynamic textures.",
+    "Accessor byte counts exclude alignment, GPU allocation, texture decoding and runtime copies.",
+    "Not a chunk manifest or proof of the 10-percent requirement."
+  ],
+  "resources": [
+    {
+      "url": "/assets/glb/boats/laser47.glb",
+      "file_bytes": 2014244,
+      "sha256": "3c4ca2cfb50a280506d09d76c8e79c0819c2bcfdcca7123a35da552c75a2407b",
+      "mesh_count": 24,
+      "referenced_accessor_bytes": 1997772,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/characters/character.glb",
+      "file_bytes": 95720,
+      "sha256": "f4e11e68ecf5181d103dddadf2dce801203b672c397c927dbe10601998eaa8cd",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 75480,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/environment/bush_large.glb",
+      "file_bytes": 6436,
+      "sha256": "10e1d9fbf29d96d1d1a56fb2ce25ae66537505101759229afe01ae22c6c45e02",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 4944,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/environment/rock_large_a.glb",
+      "file_bytes": 7552,
+      "sha256": "6dd15390fd96501dcd1454765a17ba61dbbd8d47705dfe5149c8dd92b353ce25",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 5632,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/environment/rock_small_a.glb",
+      "file_bytes": 3044,
+      "sha256": "df9fff9d711e61370e8df0caa2514c89b8f8a8dc6c6fafaf4eb2ec79c5ae07c1",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 1152,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/environment/tree_palm_bend.glb",
+      "file_bytes": 14820,
+      "sha256": "8af9dae16ce3c03183f9457996ebdd135167199514e8f4f944ee2bd82828d5c9",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 12896,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/environment/tree_palm_tall.glb",
+      "file_bytes": 15592,
+      "sha256": "cbd2c2ea7d0316be7514d44699527c566ce91e0542e8b6c6bf431a155e5655f6",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 13672,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/props/canoe.glb",
+      "file_bytes": 15780,
+      "sha256": "ad9c7a315f55accbce8d1ee3dc853f919f01f97ab4e3096bb235d1815aed6941",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 13920,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/props/crate.glb",
+      "file_bytes": 18084,
+      "sha256": "122f443b246b9a02024464b023d15c463e4af79998d1389c54257cbfad9d1504",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 16200,
+      "external_uris": [
+        "Textures/colormap.png"
+      ]
+    },
+    {
+      "url": "/assets/glb/props/flag.glb",
+      "file_bytes": 10664,
+      "sha256": "381401c6f1fb0d239cc4c2ba14d51494e2271f367d049fb97f3d5190f4014bca",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 8940,
+      "external_uris": [
+        "Textures/colormap.png"
+      ]
+    },
+    {
+      "url": "/assets/glb/props/sign.glb",
+      "file_bytes": 5040,
+      "sha256": "c658c21672ecd63c5d3e53f06f875d68e6509edb1ab7e3b75374df7c61e7dd0c",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 2768,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/props/Textures/colormap.png",
+      "file_bytes": 8706,
+      "sha256": "0d4947d34ff32acf4a359c7f22ca784e057e7e72f622170a9a77b6fc88fdb70e"
+    }
+  ]
+}
