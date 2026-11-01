@@ -161,11 +161,38 @@ def test_vest_can_be_removed_and_put_back_without_resetting_story(game):
     player.x, player.z = 15, 5
     worn = client.post("/api/story/interact", json={"target": "vest"}).json()["story"]
     assert worn["has_vest"] and worn["step"] == "rules"
+    assert player.to_dict()["has_vest"] is True
     removed = client.post("/api/story/interact", json={"target": "vest"}).json()["story"]
     assert not removed["has_vest"] and removed["step"] == "rules"
+    assert player.to_dict()["has_vest"] is False
     assert not client.get("/api/story").json()["has_vest"]
     assert not talk(client, player, "judge")["story"]["has_vest"]
     player.x, player.z = 15, 5
     worn_again = client.post("/api/story/interact", json={"target": "vest"}).json()["story"]
     assert worn_again["has_vest"] and worn_again["step"] == "pier"
     assert client.get("/api/story").json()["has_vest"]
+
+
+def test_admin_player_list_and_selective_rights(game, tmp_path, monkeypatch):
+    from app.admin import access
+    client, player = game
+    monkeypatch.setattr(access, "ADMIN_PATH", tmp_path / "admins.json")
+    assert client.get("/api/admin/players").status_code == 403
+    credentials = {"username": "another_admin_test", "password": "test-only-password"}
+    other_id = client.post("/api/auth/register", json=credentials).json()["id"]
+    assert client.put(f"/api/admin/players/{other_id}/rights", json={"admin": True}).status_code == 403
+    access.write_admin_ids({player.user_id})
+    player.fps, player.ping_ms, player.metrics_at = 58.0, 22.0, __import__("time").monotonic()
+    data = client.get("/api/admin/players").json()
+    own = next(item for item in data["players"] if item["id"] == player.user_id)
+    assert own["online"] and own["fps"] == 58 and own["ping"] == 22
+    assert client.put(f"/api/admin/players/{other_id}/rights", json={"admin": True}).status_code == 200
+    assert access.admin_ids() == {player.user_id, other_id}
+    assert client.put(f"/api/admin/players/{player.user_id}/settings", json={"speedMultiplier": 1.5}).status_code == 200
+    assert player.speed_multiplier == 1.5
+    assert client.put(f"/api/admin/players/{player.user_id}/settings", json={"speedMultiplier": 5}).status_code == 422
+    saved = client.get("/api/admin/players").json()["players"]
+    assert next(item for item in saved if item["id"] == player.user_id)["speedMultiplier"] == 1.5
+    assert client.put(f"/api/admin/players/{player.user_id}/rights", json={"admin": False}).status_code == 400
+    assert client.put(f"/api/admin/players/{other_id}/rights", json={"admin": False}).status_code == 200
+    assert access.admin_ids() == {player.user_id}

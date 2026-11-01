@@ -25,6 +25,10 @@ export class Game {
   private worldTimer: number | null = null;
   private changingWorld = false;
   private readonly adminButton = document.createElement("button");
+  private readonly adminOverlay = document.createElement("div");
+  private readonly adminFrame = document.createElement("iframe");
+  private metricFrames = 0;
+  private metricStart = performance.now();
   private readonly loginOverlay: NetworkLoginOverlay;
   private hasConnectedOnce = false;
   private unsubscribeNetworkStatus: (() => void) | null = null;
@@ -46,7 +50,18 @@ export class Game {
     this.adminButton.textContent = "⚙ Админ-панель";
     this.adminButton.className = "admin-entry";
     this.adminButton.hidden = true;
-    this.adminButton.addEventListener("click", () => { if (this.connection) window.open(new URL("/admin.html", this.connection.baseUrl).toString(), "_blank"); });
+    this.adminOverlay.className = "admin-overlay"; this.adminOverlay.hidden = true;
+    const adminClose = document.createElement("button"); adminClose.className = "admin-close"; adminClose.textContent = "Закрыть ×";
+    adminClose.addEventListener("click", () => this.closeAdmin());
+    this.adminFrame.title = "Админ-панель";
+    this.adminOverlay.append(adminClose, this.adminFrame); document.body.append(this.adminOverlay);
+    this.adminButton.addEventListener("click", () => {
+      const connection = this.connection; if (!connection) return;
+      const url = new URL("/admin.html", connection.baseUrl);
+      this.adminFrame.onload = () => this.adminFrame.contentWindow?.postMessage({ type: "sail-admin-auth", token: connection.token }, url.origin);
+      this.adminFrame.src = url.toString(); this.adminOverlay.hidden = false;
+      this.hubScene.setActive(false); document.exitPointerLock?.();
+    });
     document.body.append(this.adminButton);
     this.loginOverlay = new NetworkLoginOverlay(this.authenticate);
     this.loginOverlay.show();
@@ -79,6 +94,7 @@ export class Game {
         this.raceScene = null;
         this.hubScene.setActive(true);
         this.adminButton.hidden = true;
+        this.closeAdmin();
         this.connection = null;
         if (this.hasConnectedOnce) this.loginOverlay.show();
       }
@@ -88,19 +104,26 @@ export class Game {
   public start(): void {
     this.engine.runRenderLoop(() => {
       const deltaSeconds = this.engine.getDeltaTime() / 1000;
+      this.metricFrames++;
+      const now = performance.now();
+      if (now - this.metricStart >= 5000) {
+        if (this.network.isConnected) this.network.sendMetrics(this.metricFrames * 1000 / (now - this.metricStart));
+        this.metricFrames = 0; this.metricStart = now;
+      }
 
       if (this.raceScene) this.raceScene.update(deltaSeconds);
       else { this.hubScene.update(deltaSeconds); this.scene.render(); }
     });
 
     window.addEventListener("resize", this.resize);
-    this.worldTimer = window.setInterval(() => { void this.refreshWorld(); }, 3000);
+    this.worldTimer = window.setInterval(() => { void this.refreshWorld(); if (this.connection) void this.checkAdmin(this.connection.baseUrl, this.connection.token); }, 3000);
   }
 
   public dispose(): void {
     window.removeEventListener("resize", this.resize);
     if (this.worldTimer !== null) window.clearInterval(this.worldTimer);
     this.adminButton.remove();
+    this.adminOverlay.remove();
     this.unsubscribeNetworkStatus?.();
     this.gameSubscriptions.forEach((unsubscribe) => unsubscribe());
     this.raceScene?.dispose();
@@ -195,7 +218,7 @@ private readonly authenticate = async (
 
   private async refreshWorld(): Promise<void> {
     const connection = this.connection;
-    if (!connection || this.raceScene || this.changingWorld || !this.network.isConnected || !this.hubScene.canApplyWorld) return;
+    if (!connection || !this.adminOverlay.hidden || this.raceScene || this.changingWorld || !this.network.isConnected || !this.hubScene.canApplyWorld) return;
     this.changingWorld = true;
     try {
       const published = await fetchWorld(connection.baseUrl);
@@ -216,6 +239,13 @@ private readonly authenticate = async (
       const response = await fetch(`${baseUrl}/api/admin/world`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
       if (this.connection?.token === token) this.adminButton.hidden = !response.ok;
     } catch { this.adminButton.hidden = true; }
+  }
+
+  private closeAdmin(): void {
+    if (this.adminOverlay.hidden) return;
+    this.adminOverlay.hidden = true; this.adminFrame.src = "about:blank";
+    if (!this.raceScene) this.hubScene.setActive(true);
+    this.canvas.focus();
   }
 
   private readonly resize = (): void => {

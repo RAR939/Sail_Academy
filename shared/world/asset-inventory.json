@@ -1,7 +1,7 @@
 {
   "version": 1,
   "kind": "asset_inventory_not_runtime_budget",
-  "file_bytes_total": 4494583,
+  "file_bytes_total": 23318043,
   "limitations": [
     "Includes GLB-directory resources and coastal textures, including assets not instantiated in the hub.",
     "Excludes procedural meshes and dynamic textures.",
@@ -31,6 +31,70 @@
       "sha256": "ffb68827a8f7b719279fa64f5bc850779e1b94b46cc6ca608063c19302bc882f",
       "mesh_count": 1,
       "referenced_accessor_bytes": 75480,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/characters/quaternius/smooth_female_alternative.glb",
+      "file_bytes": 2191012,
+      "sha256": "2a49bdf73cfe78f2c8ad41f650c599f3e6d4705325e86803c9c4510e71e7a1cc",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 1098240,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/characters/quaternius/smooth_female_casual.glb",
+      "file_bytes": 2223960,
+      "sha256": "efb679fda74a57fd2a19ff73ec81af1ac34786b66a64c78601642dc5baa5c018",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 1129440,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/characters/quaternius/smooth_female_dress.glb",
+      "file_bytes": 2295288,
+      "sha256": "257174428252a2bfc50871c84c7938a20648575e5d10f30b8c0b582abaf8a576",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 1194960,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/characters/quaternius/smooth_female_tanktop.glb",
+      "file_bytes": 2223196,
+      "sha256": "81a92a9edb42b5af78767b6df639b39a5ac273b7f40769fb7a55b1e24d0b30bb",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 1149120,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/characters/quaternius/smooth_male_casual.glb",
+      "file_bytes": 2355448,
+      "sha256": "4478371443d776224a0adc76733bbc9b2fdf5681b537d77b60e7cdf5eeaa59c4",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 1237392,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/characters/quaternius/smooth_male_longsleeve.glb",
+      "file_bytes": 2438388,
+      "sha256": "74cbddfd55fa4c66b89d2606b799162cf0e461148cdae5fc5a4024fa37cb3250",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 1311024,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/characters/quaternius/smooth_male_shirt.glb",
+      "file_bytes": 2364096,
+      "sha256": "6e80f6c584deba87b5b1abd554cd43b9efdb6822f2000cdd03ebb90f223d15cf",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 1241760,
+      "external_uris": []
+    },
+    {
+      "url": "/assets/glb/characters/quaternius/smooth_male_suit.glb",
+      "file_bytes": 2732072,
+      "sha256": "66b27bdd0ef20c04efaf1ab37d3dba07368a6f751f94eb712836bf1b29bd536f",
+      "mesh_count": 1,
+      "referenced_accessor_bytes": 1578960,
       "external_uris": []
     },
     {

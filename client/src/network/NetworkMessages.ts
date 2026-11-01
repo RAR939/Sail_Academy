@@ -10,6 +10,8 @@ export interface PlayerStateMessage {
   id: number;
   username: string;
   skin?: string;
+  has_vest?: boolean;
+  speed_multiplier?: number;
   x: number;
   y: number;
   z: number;
@@ -69,6 +71,7 @@ export type ClientMessage =
   | BoatInputMessage
   | CreateRaceMessage
   | { t: "start_race" }
+  | { t: "metrics"; fps: number; ping: number | null }
   | EnterLocationMessage;
 
 export interface WelcomeMessage {
@@ -132,6 +135,8 @@ export interface RaceStateMessage {
 export interface RaceLobbyMessage {
   t: "race_lobby";
   roomId: string;
+  maxPlayers: number;
+  countdownSeconds: number;
   hostId: number | null;
   phase: "waiting" | "countdown" | "racing";
   secondsLeft: number | null;

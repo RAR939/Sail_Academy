@@ -31,8 +31,8 @@ def generate_local(messages: list[dict]) -> str:
     return content.strip()[:2400]
 
 
-async def answer(npc_id: str, text: str, history: list[dict], lesson: str, repeated: bool) -> tuple[str, str]:
-    npc = NPCS[npc_id]
+async def answer(npc_id: str, text: str, history: list[dict], lesson: str, repeated: bool, overrides: dict | None = None) -> tuple[str, str]:
+    npc = {**NPCS[npc_id], **(overrides or {})}
     fallback = lesson or npc["facts"]
     if repeated and not lesson:
         fallback = "Мы уже это обсуждали, напомню главное. " + fallback

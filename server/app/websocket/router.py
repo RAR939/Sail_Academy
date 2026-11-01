@@ -59,7 +59,7 @@ def validate_player_movement(
     horizontal_distance = math.sqrt(dx * dx + dz * dz)
     vertical_distance = abs(dy)
 
-    max_horizontal = world_config.read()[0].player.runSpeed * elapsed + MOVEMENT_TOLERANCE
+    max_horizontal = world_config.read()[0].player.runSpeed * player.speed_multiplier * elapsed + MOVEMENT_TOLERANCE
     max_vertical = PLAYER_MAX_VERTICAL_SPEED * elapsed + MOVEMENT_TOLERANCE
 
     return (
@@ -201,7 +201,7 @@ async def game_websocket(websocket: WebSocket):
             username = user.username
 
         skin = auth_message.get("skin", "skaterMaleA")
-        if skin not in ("skaterMaleA", "skaterFemaleA", "criminalMaleA", "cyborgFemaleA"):
+        if skin not in ("skaterMaleA", "skaterFemaleA", "criminalMaleA", "cyborgFemaleA", "male_shirt", "male_suit", "female_alternative", "female_dress"):
             await websocket.close(code=1008, reason="Invalid skin")
             return
 
@@ -215,6 +215,16 @@ async def game_websocket(websocket: WebSocket):
         boat = BoatState(
             owner_id=user_id
         )
+
+        # Restore equipment before broadcasting the first room snapshot.
+        from app.api.shore import progress_row, vest_state, story_lock
+        from app.admin.player_settings import speed_setting
+        async with story_lock:
+            async with AsyncSessionLocal() as session:
+                progress = await progress_row(session, user_id)
+                player.has_vest, _ = await vest_state(session, progress)
+                player.speed_multiplier, _ = await speed_setting(session, user_id)
+                await session.commit()
 
         room_manager.add_player(
             player=player,
@@ -268,6 +278,16 @@ async def game_websocket(websocket: WebSocket):
                 await websocket.send_json({
                     "t": "pong"
                 })
+
+            elif message_type == "metrics":
+                fps, ping = message.get("fps"), message.get("ping")
+                if not is_valid_number(fps) or not 0 <= fps <= 1000:
+                    continue
+                if ping is not None and (not is_valid_number(ping) or not 0 <= ping <= 60000):
+                    continue
+                player.fps = float(fps)
+                player.ping_ms = float(ping) if ping is not None else None
+                player.metrics_at = time.monotonic()
 
             # ---------------------------------
             # MOVEMENT

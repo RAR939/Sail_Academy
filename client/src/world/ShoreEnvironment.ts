@@ -22,7 +22,7 @@ export class ShoreEnvironment {
   private time = 0;
   public readonly dinghy: TrainingDinghy;
 
-  public constructor(private readonly scene: Scene, world: WorldConfig) {
+  public constructor(private readonly scene: Scene, world: WorldConfig, private readonly editing = false) {
     this.root = new TransformNode("shore-environment", scene);
     const settings = world.environment;
     const sky = Color3.FromHexString(settings.sky);
@@ -62,17 +62,18 @@ export class ShoreEnvironment {
     const vestMeshes: Mesh[] = [];
     let flag: Mesh | null = null;
     const boatConfig = world.boxes.find((item) => item.name === "training-dinghy");
-    for (const item of world.boxes) {
+    for (const [index, item] of world.boxes.entries()) {
       if (item.name === "training-dinghy" || item.name === "dinghy-boom") continue;
       const mesh = this.box(item.name, item.size, item.position, material(item.material), item.collision);
+      if (editing) mesh.metadata = { editorSelection: `box:${index}` };
       mesh.isVisible = item.visible;
       if (item.name.startsWith("orange-vest-")) vestMeshes.push(mesh);
       if (item.name === "wind-flag") flag = mesh;
     }
     if (!flag || !boatConfig) throw new Error("В мире отсутствуют флаг или учебная лодка");
     this.flag = flag;
-    for (const item of world.cylinders) {
-      if (item.name !== "dinghy-mast") this.cylinder(item.name, item.height, item.diameter, item.position, material(item.material));
+    for (const [index, item] of world.cylinders.entries()) {
+      if (item.name !== "dinghy-mast") { const mesh = this.cylinder(item.name, item.height, item.diameter, item.position, material(item.material)); if (editing) mesh.metadata = { editorSelection: `cylinder:${index}` }; }
     }
     for (const item of world.labels) this.label(item.text, Vector3.FromArray(item.position), item.width, item.height, item.billboard);
     this.dinghy = new TrainingDinghy(scene, this.root);
@@ -95,7 +96,7 @@ export class ShoreEnvironment {
     this.marker.material = gold;
     this.marker.parent = this.root;
     this.marker.setEnabled(false);
-    this.mergeStaticGeometry();
+    if (!editing) this.mergeStaticGeometry();
   }
 
   public setTarget(x: number, z: number, visible: boolean): void {

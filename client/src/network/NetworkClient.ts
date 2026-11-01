@@ -32,6 +32,8 @@ export class NetworkClient {
   private socket: WebSocket | null = null;
   private status: NetworkStatus = "disconnected";
   private pingTimer: number | null = null;
+  private pingSentAt: number | null = null;
+  public pingMs: number | null = null;
   private welcomeTimer: number | null = null;
   private readonly listeners = new Map<ServerMessageType, Set<(message: never) => void>>();
   private readonly statusListeners = new Set<StatusListener>();
@@ -157,6 +159,7 @@ export class NetworkClient {
           this.emitError(new Error("Сервер прислал сообщение неизвестного формата"));
           return;
         }
+        if (message.t === "pong" && this.pingSentAt !== null) { this.pingMs = Math.min(60000, performance.now() - this.pingSentAt); this.pingSentAt = null; }
 
         if (message.t === "welcome") {
           this.setStatus("connected");
@@ -229,8 +232,11 @@ export class NetworkClient {
   public startRace(): void { this.send({ t: "start_race" }); }
 
   public ping(): void {
+    this.pingSentAt = performance.now();
     this.send({ t: "ping" });
   }
+
+  public sendMetrics(fps: number): void { this.send({ t: "metrics", fps: Math.min(1000, Math.max(0, fps)), ping: this.pingMs }); }
 
   public on<T extends ServerMessageType>(
     type: T,
@@ -253,6 +259,7 @@ export class NetworkClient {
   }
 
   public disconnect(code = 1000, reason = "Client disconnect"): void {
+    this.pingMs = null; this.pingSentAt = null;
     this.stopPing();
     this.clearWelcomeTimer();
 

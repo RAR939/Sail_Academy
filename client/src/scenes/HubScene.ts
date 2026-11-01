@@ -264,7 +264,7 @@ export class HubScene {
     this.lastPlayers = players.map((state) => ({ ...state }));
     const present = new Set<number>();
     for (const state of players) {
-      if (state.id === this.localUserId) continue;
+      if (state.id === this.localUserId) { this.player.speedMultiplier = state.speed_multiplier ?? 1; continue; }
       present.add(state.id);
       const remote = this.remotePlayers.get(state.id);
       if (remote) remote.pushSnapshot(state);
