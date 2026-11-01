@@ -6,7 +6,7 @@ import re
 import sqlite3
 from pathlib import Path
 
-from app.ai.embeddings import embed
+from app.ai.embeddings import embed, index_model
 from app.config import settings
 
 KNOWLEDGE = Path(__file__).resolve().parents[2] / 'knowledge'
@@ -43,6 +43,8 @@ def chunks(text: str) -> list[str]:
 
 async def update_index(root: Path = KNOWLEDGE, db_path: str | None = None) -> dict:
     path = db_path or settings.RAG_INDEX_PATH
+    if not root.is_dir():
+        raise FileNotFoundError(f'Knowledge directory not found: {root}')
     # Snapshot all sources before any mutation; an embedding failure leaves the index untouched.
     documents = {}
     for file in sorted(root.rglob('*')):
@@ -55,11 +57,11 @@ async def update_index(root: Path = KNOWLEDGE, db_path: str | None = None) -> di
             documents[source] = (category, hashlib.sha256(content.encode()).hexdigest(), chunks(content))
     with connect(path) as db:
         old = {row[0]: (row[1], row[2]) for row in db.execute('SELECT source, digest, model FROM documents')}
-    changed = [s for s, (_, digest, _) in documents.items() if old.get(s) != (digest, settings.OLLAMA_EMBED_MODEL)]
+    changed = [s for s, (_, digest, _) in documents.items() if old.get(s) != (digest, index_model())]
     prepared = {}
     for source in changed:
         category, digest, parts = documents[source]
-        vectors = await embed(parts) if parts else []
+        vectors = await embed(['search_document: ' + part for part in parts]) if parts else []
         prepared[source] = (category, digest, parts, vectors)
     deleted = set(old) - set(documents)
     with connect(path) as db:
@@ -67,7 +69,7 @@ async def update_index(root: Path = KNOWLEDGE, db_path: str | None = None) -> di
             db.execute('DELETE FROM chunks WHERE source = ?', (source,))
             db.execute('DELETE FROM documents WHERE source = ?', (source,))
         for source, (category, digest, parts, vectors) in prepared.items():
-            db.execute('INSERT INTO documents VALUES (?, ?, ?)', (source, digest, settings.OLLAMA_EMBED_MODEL))
+            db.execute('INSERT INTO documents VALUES (?, ?, ?)', (source, digest, index_model()))
             db.executemany('INSERT INTO chunks VALUES (?, ?, ?, ?, ?)', [
                 (f'{source}#{i+1}', source, category, part, json.dumps(vector))
                 for i, (part, vector) in enumerate(zip(parts, vectors, strict=True))])

@@ -5,7 +5,7 @@ import math
 import sqlite3
 import time
 
-from app.ai.embeddings import embed
+from app.ai.embeddings import embed, index_model
 from app.config import settings
 
 SPECIALTIES = {'captain': 'sailing_basics', 'weather': 'weather_safety',
@@ -15,7 +15,7 @@ SPECIALTIES = {'captain': 'sailing_basics', 'weather': 'weather_safety',
 def _search(vector, npc_id, path, top_k, threshold):
     try:
         with sqlite3.connect(f'file:{path}?mode=ro', uri=True) as db:
-            rows = db.execute('SELECT c.id, c.source, c.category, c.text, c.embedding FROM chunks c JOIN documents d ON c.source = d.source WHERE d.model = ?', (settings.OLLAMA_EMBED_MODEL,)).fetchall()
+            rows = db.execute('SELECT c.id, c.source, c.category, c.text, c.embedding FROM chunks c JOIN documents d ON c.source = d.source WHERE d.model = ?', (index_model(),)).fetchall()
     except sqlite3.OperationalError as exc:
         if 'unable to open database file' in str(exc) or 'no such table' in str(exc):
             return []
@@ -35,7 +35,11 @@ def _search(vector, npc_id, path, top_k, threshold):
     # Relevance dominates, with a small preference for the NPC's specialty and general material.
     found.sort(key=lambda x: x['score'] + (0.03 if x['category'] in (SPECIALTIES[npc_id], 'general') else 0), reverse=True)
     unique, seen = [], set()
+    # Drop tangential hits well below the strongest semantic match.
+    best_score = max((item['score'] for item in found), default=0)
     for item in found:
+        if item['score'] < best_score - 0.03:
+            continue
         key = ' '.join(item['text'].casefold().split())
         if key not in seen:
             unique.append(item)
@@ -50,7 +54,7 @@ async def retrieve(question: str, npc_id: str, history: list[dict] | None = None
     previous = next((m['content'] for m in reversed(history or []) if m.get('role') == 'user'), '')
     query = f'{previous}\n{question}' if previous and len(question.split()) <= 4 else question
     start = time.perf_counter()
-    vector = (await embed([query]))[0]
+    vector = (await embed(['search_query: ' + query]))[0]
     embedded = time.perf_counter()
     results = await asyncio.to_thread(_search, vector, npc_id, settings.RAG_INDEX_PATH, settings.RAG_TOP_K, settings.RAG_MIN_SIMILARITY)
     return results, {'embedding_ms': round((embedded-start)*1000), 'search_ms': round((time.perf_counter()-embedded)*1000)}

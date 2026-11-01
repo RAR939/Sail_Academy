@@ -82,5 +82,85 @@ def test_real_semantic_search():
                                    ('спасательный жилет', 'жилет'), ('правый галс', 'прав')]:
             results, _ = await retriever.retrieve(question, 'captain')
             assert any(expected in item['text'].lower() for item in results), (question, results)
+        for question in ('Как приготовить пиццу?', 'Сколько спутников у Юпитера?'):
+            results, _ = await retriever.retrieve(question, 'captain')
+            assert not results, (question, results)
     asyncio.run(run())
 
+
+
+def test_query_embedding_search_and_deduplication(tmp_path, monkeypatch):
+    """The search consumes a query vector and returns ranked, distinct sources."""
+    root = tmp_path / 'knowledge'
+    for category in ('sailing_basics', 'weather_safety'):
+        (root / category).mkdir(parents=True)
+    (root / 'sailing_basics' / 'turn.txt').write_text(
+        'Поворот носом через направление ветра называется оверштаг.\n\n'
+        'Поворот носом через направление ветра называется оверштаг.', encoding='utf8')
+    (root / 'weather_safety' / 'vest.txt').write_text('Наденьте спасательный жилет.', encoding='utf8')
+    path = str(tmp_path / 'index.sqlite3')
+    requests = []
+
+    async def fake_embed(texts):
+        requests.extend(texts)
+        return [[0., 1.] if 'жилет' in t else [1., 0.] for t in texts]
+
+    async def run():
+        monkeypatch.setattr(indexer, 'embed', fake_embed)
+        monkeypatch.setattr(retriever, 'embed', fake_embed)
+        monkeypatch.setattr(retriever.settings, 'RAG_INDEX_PATH', path)
+        await indexer.update_index(root, path)
+        hits, _ = await retriever.retrieve('Как поворачивать против ветра?', 'captain')
+        assert len(hits) == 1 and 'оверштаг' in hits[0]['text']
+        assert hits[0]['source'] == 'sailing_basics/turn.txt'
+        assert hits[0]['score'] == pytest.approx(1.)
+        assert requests[-1].startswith('search_query: ')
+        assert all(t.startswith('search_document: ') for t in requests[:-1])
+        vest, _ = await retriever.retrieve('спасательный жилет', 'weather')
+        assert vest[0]['category'] == 'weather_safety'
+        with pytest.raises(FileNotFoundError):
+            await indexer.update_index(tmp_path / 'missing', path)
+        assert retriever._search([1, 0], 'captain', path, 4, .73)
+
+    asyncio.run(run())
+
+
+def test_invalid_embedding_response(monkeypatch):
+    from app.ai import embeddings
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def read(self): return b'{"embeddings": [[1, 2], [0]]}'
+    monkeypatch.setattr(embeddings.urllib.request, 'urlopen', lambda *args, **kwargs: Response())
+    with pytest.raises(ValueError):
+        embeddings._embed(['a', 'b'])
+
+
+def test_administrator_personality_and_facts_are_combined_with_rag(monkeypatch):
+    captured = []
+    async def retrieve(*args):
+        return [{'id': 'general/example#1', 'source': 'general/example', 'category': 'general',
+                 'text': 'Проверенный факт.', 'score': .9}], {}
+    async def run_sync(fn, *args):
+        return fn(*args)
+    def generate(messages):
+        captured.extend(messages)
+        return 'Ответ.'
+    monkeypatch.setattr(service, 'retrieve', retrieve)
+    monkeypatch.setattr(service, 'generate_local', generate)
+    monkeypatch.setattr(service.asyncio, 'to_thread', run_sync)
+    asyncio.run(service.answer('captain', 'Вопрос', [], '', False,
+                               {'name': 'Капитан', 'style': 'Строгий стиль', 'facts': 'Добавленный факт'}))
+    prompt = captured[0]['content']
+    assert 'Строгий стиль' in prompt
+    assert 'Добавленный факт' in prompt
+    assert '[general/example#1] Проверенный факт.' in prompt
+
+
+@pytest.mark.skipif(os.environ.get('RUN_OLLAMA_INTEGRATION') != '1', reason='requires local Ollama models and indexed corpus')
+def test_real_generation_uses_retrieved_source():
+    async def run():
+        text, backend, rag = await service.answer('captain', 'Что такое оверштаг?', [], '', False)
+        assert backend == 'ollama' and text.strip()
+        assert any('sailing_basics/' in source['id'] for source in rag['sources'])
+    asyncio.run(run())
