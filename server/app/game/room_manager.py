@@ -40,12 +40,16 @@ class RoomManager:
 
     def create_race_room(self) -> Room:
         room_id = f"race_{uuid4().hex[:8]}"
-
-        return self.create_room(
+        from app.admin import world
+        settings = world.read()[0].race
+        room = self.create_room(
             room_id=room_id,
             room_type="race",
             location_id="race_track"
         )
+        room.race_countdown = settings.countdownSeconds
+        room.race_max_players = settings.maxPlayers
+        return room
 
     def get_or_create_training_room(
         self,
@@ -77,7 +81,7 @@ class RoomManager:
             return True
 
         if room.room_type == "race":
-            return room.race_start_at is None and room.get_player_count() < MAX_RACE_PLAYERS
+            return room.race_start_at is None and room.get_player_count() < room.race_max_players
 
         return True
 

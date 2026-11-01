@@ -30,6 +30,10 @@ export class RaceScene {
   private readonly startMarker: TransformNode;
   private readonly finishMarker: TransformNode;
   private readonly committeeBoat: TransformNode;
+  private signalFlag: Mesh | null = null;
+  private laserFlag: Mesh | null = null;
+  private signalTexture: DynamicTexture | null = null;
+  private signalKey = "";
   private gateLine: Mesh | null = null;
   private gateKey = "";
   private readonly remote = new Map<number, { anchor: TransformNode; boat: TrainingDinghy }>();
@@ -190,6 +194,24 @@ export class RaceScene {
     cabin.parent = root; cabin.position.set(0,1.35,0.2); cabin.material = blue;
     const roof = MeshBuilder.CreateBox("committee-roof", {width:1.7,height:0.12,depth:1.8}, this.scene);
     roof.parent = root; roof.position.set(0,1.96,0.2); roof.material = white;
+    const mast = MeshBuilder.CreateCylinder("signal-mast", {height:4, diameter:.08}, this.scene);
+    mast.parent = root; mast.position.set(0,3.9,0); mast.material = white;
+    this.signalTexture = new DynamicTexture("race-signal-texture", {width:256,height:160}, this.scene, false);
+    const flagMaterial = new StandardMaterial("race-signal-material", this.scene);
+    flagMaterial.diffuseTexture = this.signalTexture; flagMaterial.emissiveColor = Color3.White(); flagMaterial.disableLighting = true; flagMaterial.backFaceCulling = false;
+    this.signalFlag = MeshBuilder.CreatePlane("race-signal-flag", {width:2,height:1.25}, this.scene);
+    this.signalFlag.parent = root; this.signalFlag.position.set(1,5.1,0); this.signalFlag.material = flagMaterial; this.signalFlag.billboardMode = Mesh.BILLBOARDMODE_ALL;
+    this.signalFlag.setEnabled(false);
+    const laserTexture = new DynamicTexture("laser-class-flag", {width:256,height:160}, this.scene, false);
+    const laserContext = laserTexture.getContext() as CanvasRenderingContext2D;
+    laserContext.fillStyle = "#ffffff"; laserContext.fillRect(0,0,256,160);
+    laserContext.strokeStyle = "#d92925"; laserContext.lineWidth = 11; laserContext.lineCap = "round";
+    for (let i = -2; i <= 2; i++) { const angle = i * Math.PI / 4; laserContext.beginPath(); laserContext.moveTo(128 + 18*Math.sin(angle),70 - 18*Math.cos(angle)); laserContext.lineTo(128 + 48*Math.sin(angle),70 - 48*Math.cos(angle)); laserContext.stroke(); }
+    laserContext.fillStyle = "#d92925"; laserContext.font = "bold 27px Arial"; laserContext.textAlign = "center"; laserContext.fillText("LASER",128,143); laserTexture.update();
+    const laserMaterial = new StandardMaterial("laser-class-flag-material", this.scene);
+    laserMaterial.diffuseTexture = laserTexture; laserMaterial.emissiveColor = Color3.White(); laserMaterial.disableLighting = true; laserMaterial.backFaceCulling = false;
+    this.laserFlag = MeshBuilder.CreatePlane("laser-class-flag", {width:2,height:1.25}, this.scene);
+    this.laserFlag.parent = root; this.laserFlag.position.set(1,6.45,0); this.laserFlag.material = laserMaterial; this.laserFlag.billboardMode = Mesh.BILLBOARDMODE_ALL; this.laserFlag.setEnabled(false);
     return root;
   }
 
@@ -224,6 +246,17 @@ export class RaceScene {
   }
   private renderLobby(): void {
     const lobby = this.lobby; if (!lobby) return;
+    const signal = lobby.phase === "countdown" && (lobby.secondsLeft ?? 0) <= 120 && (lobby.secondsLeft ?? 0) > 60 ? "prepare" : lobby.phase === "racing" && lobby.players.some(player => player.individualRecall) ? "recall" : "none";
+    this.laserFlag?.setEnabled(lobby.phase === "countdown");
+    if (signal !== this.signalKey && this.signalTexture && this.signalFlag) {
+      this.signalKey = signal; this.signalFlag.setEnabled(signal !== "none");
+      const ctx = this.signalTexture.getContext() as CanvasRenderingContext2D;
+      ctx.fillStyle = signal === "prepare" ? "#1b4eaa" : "#ffffff"; ctx.fillRect(0, 0, 256, 160);
+      ctx.fillStyle = signal === "prepare" ? "#ffffff" : "#1653a7";
+      if (signal === "prepare") ctx.fillRect(64, 40, 128, 80);
+      else { ctx.fillRect(0, 66, 256, 28); ctx.fillRect(114, 0, 28, 160); }
+      this.signalTexture.update();
+    }
     const remaining = Math.ceil(lobby.secondsLeft ?? 0);
     const countdown = `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, "0")}`;
     const header = lobby.phase === "waiting" ? "Ожидание участников" : lobby.phase === "countdown" ? `До старта ${countdown}` : "Старт дан";
@@ -231,7 +264,9 @@ export class RaceScene {
       const result = player.elapsed === null ? (player.individualRecall ? "индивидуальный отзыв" : player.phase === "start" ? "перед стартом" : "на дистанции") : `финиш ${player.elapsed.toFixed(1)} с`;
       return `${index + 1}. ${player.name}${player.id === lobby.hostId ? " ★" : ""} — ${result}`;
     });
-    this.lobbyText.textContent = `Комната: ${lobby.roomId}\n${header} · ${lobby.players.length}/4\n${standings.join("\n")}`;
+    const signalText = lobby.phase === "countdown" ? `Флаг Laser${signal === "prepare" ? " · флаг P" : ""}` : signal === "recall" ? "Флаг X: индивидуальный отзыв" : "";
+    this.startButton.textContent = `Начать отсчёт · ${lobby.countdownSeconds} с`;
+    this.lobbyText.textContent = `Комната: ${lobby.roomId}\n${header} · ${lobby.players.length}/${lobby.maxPlayers}\n${signalText}\n${standings.join("\n")}`;
     this.startButton.hidden = lobby.phase !== "waiting" || lobby.hostId !== this.userId;
     if (!this.startButton.hidden) this.startButton.disabled = false;
   }

@@ -9,7 +9,7 @@ export class LifeJacket {
   constructor(scene: Scene, parent: TransformNode) {
     this.root = new TransformNode("life-jacket", scene);
     this.root.parent = parent;
-    this.root.position.y = -0.10;
+    this.root.position.y = 0.13;
     this.root.position.z = 0.04;
     this.root.scaling.setAll(0.82);
     this.texture = new DynamicTexture("life-jacket-fabric", { width: 256, height: 256 }, scene, true);

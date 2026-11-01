@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "race": { "countdownSeconds": 180, "maxPlayers": 4 },
   "player": {
     "walkSpeed": 3.3,
     "runSpeed": 4.0,
@@ -1254,6 +1255,48 @@
       36.0,
       35.0,
       4.5
+    ],
+    [
+      "environment/tree_palm_bend",
+      -38,
+      21,
+      4.1
+    ],
+    [
+      "environment/tree_palm_tall",
+      39,
+      4,
+      4.2
+    ],
+    [
+      "environment/bush_large",
+      -34,
+      18,
+      1.1
+    ],
+    [
+      "environment/bush_large",
+      35,
+      18,
+      1.2
+    ],
+    [
+      "environment/rock_small_a",
+      -40,
+      -5,
+      1.2
+    ],
+    [
+      "environment/rock_large_a",
+      39,
+      -6,
+      1.4
+    ],
+    [
+      "props/crate",
+      21,
+      3,
+      0.75
     ]
   ],
   "special": {

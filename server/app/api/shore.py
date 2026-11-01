@@ -85,6 +85,9 @@ async def get_story(user: User = Depends(get_current_user), session: AsyncSessio
     async with story_lock:
         row = await progress_row(session, user.id)
         worn, _ = await vest_state(session, row)
+        player = room_manager.get_player(user.id)
+        if player:
+            player.has_vest = worn
         result = snapshot(row, worn)
         await session.commit()
         return result
@@ -113,6 +116,9 @@ async def interact(data: InteractionRequest, user: User = Depends(get_current_us
             equipment.status = "worn" if worn else "removed"
         state = snapshot(row, worn)
         await session.commit()
+        player = room_manager.get_player(user.id)
+        if player:
+            player.has_vest = worn
     if advanced:
         message = ("Жилет подобран по размеру и застёгнут. Теперь найдите судью Анну." if data.target == "vest"
                    else "Вы осмотрели нос, корму, парус и румпель учебной лодки. На воду сегодня не выходим. Вернитесь к капитану.")
@@ -157,8 +163,11 @@ async def dialog(data: DialogRequest, user: User = Depends(get_current_user), se
             # Release the DB read transaction before waiting for the model.
             await session.commit()
         repeated = any(message.get("role") == "user" and message.get("content", "").casefold() == data.text.strip().casefold() for message in history)
+        overrides = {"name": location.name}
+        if location.style: overrides["style"] = location.style
+        if location.facts: overrides["facts"] = location.facts
         try:
-            text, backend, rag = await answer(data.npc_id, data.text.strip(), history, lesson, repeated)
+            text, backend, rag = await answer(data.npc_id, data.text.strip(), history, lesson, repeated, overrides)
         except AIUnavailable:
             raise HTTPException(503, "Наставник временно недоступен. Попробуйте позже.")
         async with story_lock:

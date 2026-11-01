@@ -17,6 +17,8 @@ class Room:
     races: dict[int, RaceProgress] = field(default_factory=dict)
     race_host: int | None = None
     race_start_at: float | None = None
+    race_countdown: int = 180
+    race_max_players: int = 4
 
     created_at: float = field(default_factory=time.time)
 
@@ -50,12 +52,12 @@ class Room:
             self.race_host = next(iter(self.players), None)
         return player
 
-    def start_countdown(self, user_id: int, now: float, seconds: float = 180.0) -> None:
+    def start_countdown(self, user_id: int, now: float, seconds: float | None = None) -> None:
         if self.room_type != "race" or user_id != self.race_host:
             raise ValueError("Отсчёт может начать только создатель комнаты")
         if self.race_start_at is not None:
             raise ValueError("Отсчёт уже запущен")
-        self.race_start_at = now + seconds
+        self.race_start_at = now + (self.race_countdown if seconds is None else seconds)
         for race in self.races.values():
             race.start_signal_at = self.race_start_at
 
@@ -66,7 +68,7 @@ class Room:
             race = self.races.get(user_id)
             results.append({"id": user_id, "name": player.username, "phase": race.phase if race else "start", "elapsed": race.finished_in if race else None, "individualRecall": race.individual_recall if race else False})
         results.sort(key=lambda item: (item["elapsed"] is None, item["elapsed"] if item["elapsed"] is not None else 0))
-        return {"t": "race_lobby", "roomId": self.room_id, "hostId": self.race_host, "phase": phase,
+        return {"t": "race_lobby", "roomId": self.room_id, "hostId": self.race_host, "phase": phase, "maxPlayers": self.race_max_players, "countdownSeconds": self.race_countdown,
                 "secondsLeft": max(0.0, self.race_start_at - now) if self.race_start_at is not None else None,
                 "players": results}
 

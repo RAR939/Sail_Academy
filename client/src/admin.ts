@@ -13,12 +13,13 @@ root.innerHTML = `
 <main id="editor" hidden>
   <div class="workspace"><section class="controls"><div class="section-head"><div><span class="eyebrow">ПАРАМЕТРЫ</span><h2>Настройки и объекты</h2></div><span id="dirty" class="badge">Сохранено</span></div>
     <div id="fields" class="fields"></div>
-    <div class="object-editor"><label>Объект мира<select id="objects"></select></label><div id="coordinates" class="fields"></div></div>
+    <div class="object-editor"><label>Объект мира<select id="objects"></select></label><div class="actions"><select id="add-kind"><option value="box">Простой объект</option><option value="environment/tree_palm_tall">Пальма</option><option value="environment/bush_large">Куст</option><option value="environment/rock_large_a">Камень</option><option value="props/crate">Ящик</option></select><button id="add-object" type="button">Добавить</button><button id="delete-object" type="button" class="secondary">Удалить</button></div><div id="coordinates" class="fields"></div></div>
     <details><summary>Весь файл мира (JSON)</summary><p>Здесь доступны все объекты, материалы, NPC и подписи. Предпросмотр обновляется автоматически после проверки.</p><textarea id="json" spellcheck="false" aria-label="Файл мира JSON"></textarea></details>
     <div class="actions"><button id="save">Сохранить мир</button><button id="discard" class="secondary">Отменить изменения</button></div>
     <p id="status" class="status" role="status"></p>
+    <section class="backups"><h3>Игроки и права</h3><p>FPS и задержка измеряются на клиенте; данные обновляются каждые несколько секунд.</p><div id="admin-players"></div><p id="players-status" role="status"></p></section>
     <section class="backups"><h3>Резервные копии</h3><p>Создаются автоматически перед сохранением и откатом.</p><select id="backups" aria-label="Резервная копия"></select><div class="actions"><button id="load-backup" class="secondary">Открыть в черновике</button><button id="restore" class="secondary">Откатить мир</button></div></section>
-  </section><section class="preview"><div class="preview-bar"><div><span class="eyebrow">ПРЕДПРОСМОТР</span><h2>Береговой клуб</h2></div><span>ЛКМ — вращение · колесо — масштаб</span></div><canvas id="preview-canvas"></canvas></section></div>
+  </section><section class="preview"><div class="preview-bar"><div><span class="eyebrow">ПРЕДПРОСМОТР</span><h2>Береговой клуб</h2></div><span>Клик по объекту — выбрать · перетаскивание — вращение · колесо — масштаб</span></div><canvas id="preview-canvas"></canvas></section></div>
 </main>`;
 const $ = <T extends Element>(selector: string): T => root.querySelector<T>(selector)!;
 const login = $<HTMLElement>("#login"), editor = $<HTMLElement>("#editor"), status = $<HTMLElement>("#status");
@@ -29,6 +30,53 @@ let saved: WorldConfig | null = null, revision = "", timer = 0, requestNumber = 
 let engine: Engine | null = null, preview: Scene | null = null, previewEnvironment: ShoreEnvironment | null = null, previewLoader: AssetLoader | null = null;
 let camera: ArcRotateCamera | null = null;
 let previewCharacters: Character[] = [];
+let playersTimer: number | null = null;
+let loadingPlayers = false;
+
+async function refreshPlayers(): Promise<void> {
+  if (loadingPlayers || editor.hidden) return;
+  if (document.activeElement instanceof HTMLInputElement && $<HTMLElement>("#admin-players").contains(document.activeElement)) return;
+  loadingPlayers = true;
+  try {
+    const data = await api<{selfId: number; players: Array<{id:number; username:string; admin:boolean; online:boolean; room:string|null; fps:number|null; ping:number|null; speedMultiplier:number}>}>("/api/admin/players");
+    const container = $<HTMLElement>("#admin-players"); container.replaceChildren();
+    for (const player of data.players) {
+      const row = document.createElement("div"); row.className = "admin-player-row";
+      const info = document.createElement("span");
+      const metrics = player.online ? `${player.room} · FPS ${player.fps === null ? "—" : player.fps.toFixed(0)} · ping ${player.ping === null ? "—" : Math.round(player.ping) + " мс"}` : "не в сети";
+      info.textContent = `${player.username}${player.admin ? " · администратор" : ""} — ${metrics}`;
+      const button = document.createElement("button"); button.type = "button"; button.className = "secondary";
+      button.textContent = player.admin ? "Снять права" : "Выдать права"; button.disabled = player.id === data.selfId;
+      button.addEventListener("click", () => { void (async () => {
+        button.disabled = true;
+        try { await api(`/api/admin/players/${player.id}/rights`, {method:"PUT",body:JSON.stringify({admin:!player.admin})}); await refreshPlayers(); }
+        catch (error) { $<HTMLElement>("#players-status").textContent = error instanceof Error ? error.message : "Ошибка изменения прав"; button.disabled = false; }
+      })(); });
+      const actions = document.createElement("div"); actions.append(button);
+      const speedLabel = document.createElement("label"); speedLabel.textContent = "Скорость × ";
+      const speed = document.createElement("input"); speed.type = "number"; speed.min = "0.25"; speed.max = "2"; speed.step = "0.05"; speed.value = String(player.speedMultiplier); speed.style.width = "70px";
+      const saveSpeed = document.createElement("button"); saveSpeed.type = "button"; saveSpeed.className = "secondary"; saveSpeed.textContent = "Применить";
+      saveSpeed.addEventListener("click", () => { void (async () => {
+        if (!speed.reportValidity()) return; saveSpeed.disabled = true;
+        try { await api(`/api/admin/players/${player.id}/settings`, {method:"PUT",body:JSON.stringify({speedMultiplier:speed.valueAsNumber})}); await refreshPlayers(); }
+        catch (error) { $<HTMLElement>("#players-status").textContent = error instanceof Error ? error.message : "Ошибка настройки"; saveSpeed.disabled = false; }
+      })(); });
+      speedLabel.append(speed); actions.append(speedLabel, saveSpeed);
+      if (player.online && player.id !== data.selfId) {
+        const disconnect = document.createElement("button"); disconnect.type = "button"; disconnect.className = "secondary"; disconnect.textContent = "Отключить";
+        disconnect.addEventListener("click", () => { void (async () => {
+          disconnect.disabled = true;
+          try { await api(`/api/admin/players/${player.id}/disconnect`, {method:"POST"}); await refreshPlayers(); }
+          catch (error) { $<HTMLElement>("#players-status").textContent = error instanceof Error ? error.message : "Не удалось отключить игрока"; disconnect.disabled = false; }
+        })(); });
+        actions.append(disconnect);
+      }
+      row.append(info, actions); container.append(row);
+    }
+    $<HTMLElement>("#players-status").textContent = "";
+  } catch (error) { $<HTMLElement>("#players-status").textContent = error instanceof Error ? error.message : "Не удалось получить список"; }
+  finally { loadingPlayers = false; }
+}
 
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(path, { ...init, cache: "no-store", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...init.headers } });
@@ -46,10 +94,11 @@ function markDirty(): void {
   const changed = !saved || json.value !== JSON.stringify(saved, null, 2);
   dirty.textContent = changed ? "Есть изменения" : "Сохранено"; dirty.classList.toggle("changed", changed);
 }
-const fields: Array<["player" | "camera" | "environment", string, string, number]> = [
+const fields: Array<["player" | "camera" | "environment" | "race", string, string, number]> = [
   ["player", "walkSpeed", "Ходьба, м/с", .1], ["player", "runSpeed", "Бег, м/с", .1], ["player", "acceleration", "Ускорение", 1], ["player", "braking", "Торможение", 1], ["player", "gravity", "Гравитация", 1], ["player", "turnSpeed", "Поворот персонажа", .5],
   ["camera", "distance", "Дистанция камеры", .1], ["camera", "minDistance", "Мин. дистанция", .1], ["camera", "maxDistance", "Макс. дистанция", .1], ["camera", "height", "Высота цели камеры", .1], ["camera", "followSpeed", "Скорость следования", .1], ["camera", "manualDelay", "Пауза после мыши, с", .1],
   ["environment", "fogStart", "Начало тумана", 1], ["environment", "fogEnd", "Конец тумана", 1], ["environment", "lightIntensity", "Освещение", .05],
+  ["race", "countdownSeconds", "Гонка: предстартовый отсчёт, с", 1], ["race", "maxPlayers", "Гонка: максимум игроков", 1],
 ];
 const fieldsRoot = $<HTMLElement>("#fields");
 for (const [section, key, title, step] of fields) {
@@ -61,7 +110,7 @@ for (const [section, key, title, step] of fields) {
 }
 function syncFields(world: WorldConfig): void {
   for (const input of fieldsRoot.querySelectorAll<HTMLInputElement>("input")) {
-    const section = input.dataset.section as "player" | "camera" | "environment";
+    const section = input.dataset.section as "player" | "camera" | "environment" | "race";
     const values = world[section] as unknown as Record<string, number>;
     input.value = String(values[input.dataset.key!] ?? "");
   }
@@ -105,8 +154,48 @@ function renderCoordinates(world: WorldConfig): void {
     input.addEventListener("input", () => { if (!Number.isFinite(input.valueAsNumber)) return; try { const draft = parseDraft(); update(draft, input.valueAsNumber); json.value = JSON.stringify(draft, null, 2); markDirty(); schedulePreview(); } catch { showStatus("Исправьте JSON", true); } });
     label.append(input); container.append(label);
   }
+  if (kind === "npc" && world.npcs[index]) {
+    const npc = world.npcs[index]!;
+    const edit = (key: "name" | "role" | "skin" | "style" | "facts", value: string) => {
+      try { const draft = parseDraft(); Object.assign(draft.npcs[index]!, { [key]: value || (key === "style" || key === "facts" ? null : "") }); json.value = JSON.stringify(draft, null, 2); markDirty(); schedulePreview(); }
+      catch { showStatus("Исправьте JSON", true); }
+    };
+    for (const [key, title] of [["name", "Имя"], ["role", "Роль"], ["style", "Манера речи агента"], ["facts", "Учебные сведения агента"]] as const) {
+      const label = document.createElement("label"); label.textContent = title;
+      const input = document.createElement("input"); input.value = npc[key] ?? "";
+      input.placeholder = key === "style" || key === "facts" ? "По умолчанию" : "";
+      input.addEventListener("input", () => edit(key, input.value)); label.append(input); container.append(label);
+    }
+    const label = document.createElement("label"); label.textContent = "Модель";
+    const select = document.createElement("select");
+    for (const [value, title] of [["skaterMaleA", "Мужчина: повседневная"], ["criminalMaleA", "Мужчина: длинный рукав"], ["male_shirt", "Мужчина: рубашка"], ["male_suit", "Мужчина: костюм"], ["skaterFemaleA", "Женщина: повседневная"], ["cyborgFemaleA", "Женщина: майка"], ["female_alternative", "Женщина: альтернативная"], ["female_dress", "Женщина: платье"]]) {
+      const option = document.createElement("option"); option.value = value!; option.textContent = title!; select.append(option);
+    }
+    select.value = npc.skin; select.addEventListener("change", () => edit("skin", select.value)); label.append(select); container.append(label);
+  }
 }
 objects.addEventListener("change", () => { try { renderCoordinates(parseDraft()); } catch { /* draft incomplete */ } });
+$<HTMLButtonElement>("#add-object").addEventListener("click", () => {
+  try {
+    const draft = parseDraft(), kind = $<HTMLSelectElement>("#add-kind").value;
+    if (kind === "box") draft.boxes.push({name:`object-${Date.now()}`,size:[2,2,2],position:[0,1,0],material:"ivory-walls",collision:true,visible:true});
+    else draft.props.push([kind, 0, 0, 1]);
+    setDraft(draft); objects.value = kind === "box" ? `box:${draft.boxes.length-1}` : `prop:${draft.props.length-1}`; renderCoordinates(draft);
+  } catch { showStatus("Не удалось добавить объект", true); }
+});
+$<HTMLButtonElement>("#delete-object").addEventListener("click", () => {
+  try {
+    const draft = parseDraft(), [kind, raw] = objects.value.split(":"), index = Number(raw);
+    if (kind === "npc") { showStatus("Наставники используются сценарием и не удаляются", true); return; }
+    if (kind === "box") {
+      const item = draft.boxes[index]; if (!item) return;
+      if (["wind-flag", "training-dinghy"].includes(item.name) || (item.name.startsWith("orange-vest-") && draft.boxes.filter(b => b.name.startsWith("orange-vest-")).length === 1)) { showStatus("Этот объект необходим сценарию", true); return; }
+      draft.boxes.splice(index,1);
+    } else if (kind === "cylinder") draft.cylinders.splice(index,1);
+    else if (kind === "prop") draft.props.splice(index,1); else return;
+    setDraft(draft);
+  } catch { showStatus("Не удалось удалить объект", true); }
+});
 json.addEventListener("input", () => { markDirty(); try { const draft = parseDraft(); syncFields(draft); syncObjects(draft); } catch { /* wait for valid JSON */ } schedulePreview(); });
 function schedulePreview(): void {
   window.clearTimeout(timer); const current = ++requestNumber;
@@ -128,10 +217,10 @@ function renderPreview(world: WorldConfig): void {
   scene.collisionsEnabled = true;
   const nextCamera = new ArcRotateCamera("admin-camera", previousCamera?.alpha ?? -1.3, previousCamera?.beta ?? 0.9, previousCamera?.radius ?? 55, previousCamera?.target ?? new Vector3(0, 0, 8), scene);
   camera = nextCamera; nextCamera.lowerRadiusLimit = 3; nextCamera.upperRadiusLimit = 150; nextCamera.wheelPrecision = 3; nextCamera.attachControl(canvas, true); scene.activeCamera = nextCamera;
-  previewEnvironment = new ShoreEnvironment(scene, world);
+  previewEnvironment = new ShoreEnvironment(scene, world, true);
   const loader = new AssetLoader(scene); previewLoader = loader;
   const version = ++previewVersion;
-  for (const npc of world.npcs) {
+  for (const [npcIndex, npc] of world.npcs.entries()) {
     const station = previewEnvironment.stations.get(npc.id)!;
     const anchor = new TransformNode(`preview-npc-${npc.id}`, scene);
     anchor.parent = station.anchor; anchor.position.y = 0.9;
@@ -140,12 +229,17 @@ function renderPreview(world: WorldConfig): void {
     void character.load(npc.skin).then(() => {
       if (version !== previewVersion) return;
       const meshes = character.getMeshes();
-      if (meshes.length) { station.meshes.forEach(mesh => mesh.dispose()); station.meshes = meshes; }
+      if (meshes.length) { station.meshes.forEach(mesh => mesh.dispose()); station.meshes = meshes; for (const mesh of meshes) { mesh.isPickable = true; mesh.metadata = { ...mesh.metadata, editorSelection: `npc:${npcIndex}` }; } }
     }).catch(console.warn);
   }
-  for (const [path, x, z, scale] of world.props) {
-    void loader.spawn(`/assets/glb/${path}.glb`, { name: `preview-${path}-${x}-${z}`, position: new Vector3(x, 0, z), scaling: new Vector3(scale, scale, scale) }).then(asset => { if (version !== previewVersion) asset.dispose(); }).catch(console.warn);
+  for (const [propIndex, [path, x, z, scale]] of world.props.entries()) {
+    void loader.spawn(`/assets/glb/${path}.glb`, { name: `preview-${path}-${x}-${z}`, position: new Vector3(x, 0, z), scaling: new Vector3(scale, scale, scale) }).then(asset => { if (version !== previewVersion) { asset.dispose(); return; } for (const root of asset.roots) for (const mesh of root.getChildMeshes()) { mesh.isPickable = true; mesh.metadata = { ...mesh.metadata, editorSelection: `prop:${propIndex}` }; } }).catch(console.warn);
   }
+  scene.onPointerPick = (_event, pick) => {
+    const selection = pick.pickedMesh?.metadata?.editorSelection;
+    if (typeof selection !== "string" || ![...objects.options].some(option => option.value === selection)) return;
+    objects.value = selection; renderCoordinates(world); objects.scrollIntoView({block:"nearest"});
+  };
 }
 async function refreshBackups(): Promise<void> {
   const result = await api<{backups: Array<{id: string}>}>("/api/admin/world/backups"); backups.replaceChildren();
@@ -160,7 +254,17 @@ async function openEditor(): Promise<void> {
     engine.runRenderLoop(() => { if (preview && !preview.isDisposed) preview.render(); });
   }
   setDraft(response.world); await refreshBackups();
+  await refreshPlayers();
+  if (playersTimer === null) playersTimer = window.setInterval(() => { void refreshPlayers(); }, 5000);
 }
+window.addEventListener("message", (event: MessageEvent<unknown>) => {
+  if (event.source !== window.parent || window.parent === window) return;
+  let parentOrigin: string; try { parentOrigin = new URL(document.referrer).origin; } catch { return; }
+  if (event.origin !== parentOrigin || !event.data || typeof event.data !== "object") return;
+  const data = event.data as {type?: unknown; token?: unknown};
+  if (data.type !== "sail-admin-auth" || typeof data.token !== "string") return;
+  token = data.token; void openEditor().catch(error => showStatus(error instanceof Error ? error.message : "Нет доступа", true));
+});
 $<HTMLFormElement>("#login form").addEventListener("submit", event => { event.preventDefault(); void (async () => {
   try { const form = new FormData(event.currentTarget as HTMLFormElement); const response = await fetch("/api/auth/login", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:form.get("username"),password:form.get("password")})}); const data = await response.json() as {access_token?: string; detail?: string}; if (!response.ok || !data.access_token) throw new Error(data.detail ?? "Не удалось войти"); token = data.access_token; await openEditor(); }
   catch (error) { alert(error instanceof Error ? error.message : "Ошибка входа"); }

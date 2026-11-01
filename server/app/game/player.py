@@ -15,6 +15,11 @@ class PlayerState:
 
     ry: float = 0.0
     anim: str = "idle"
+    has_vest: bool = False
+    speed_multiplier: float = 1.0
+    fps: float | None = None
+    ping_ms: float | None = None
+    metrics_at: float = 0.0
 
     last_update: float = field(default_factory=time.monotonic)
 
@@ -46,4 +51,6 @@ class PlayerState:
             "z": self.z,
             "ry": self.ry,
             "anim": self.anim,
+            "has_vest": self.has_vest,
+            "speed_multiplier": self.speed_multiplier,
         }

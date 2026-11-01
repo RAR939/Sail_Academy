@@ -51,6 +51,7 @@ export class Player {
   public readonly visual: Mesh;
 
   private readonly walkSpeed: number;
+  public speedMultiplier = 1;
   private readonly runSpeed: number;
   private readonly gravity: number;
   private readonly acceleration: number;
@@ -156,7 +157,7 @@ export class Player {
       this.collider.rotation.y += difference * (1 - Math.exp(-this.turnSpeed * delta));
     }
 
-    const speed = this.input.run ? this.runSpeed : this.walkSpeed;
+    const speed = (this.input.run ? this.runSpeed : this.walkSpeed) * this.speedMultiplier;
     const desiredVelocity = hasMovement ? direction.scale(speed) : Vector3.Zero();
     const change = desiredVelocity.subtract(this.horizontalVelocity);
     const maxChange = (hasMovement ? this.acceleration : this.braking) * delta;

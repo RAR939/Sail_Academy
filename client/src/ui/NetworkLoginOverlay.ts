@@ -94,10 +94,14 @@ export class NetworkLoginOverlay {
 
             <label class="skin-choice">Персонаж
               <select id="skin" aria-label="Выбор персонажа">
-                <option value="skaterMaleA">Скейтбордист</option>
-                <option value="skaterFemaleA">Скейтбордистка</option>
-                <option value="criminalMaleA">Искатель приключений</option>
-                <option value="cyborgFemaleA">Киборг</option>
+                <option value="skaterMaleA">Мужчина — повседневная одежда</option>
+                <option value="skaterFemaleA">Женщина — повседневная одежда</option>
+                <option value="criminalMaleA">Мужчина — длинный рукав</option>
+                <option value="cyborgFemaleA">Женщина — майка</option>
+                <option value="male_shirt">Мужчина — рубашка</option>
+                <option value="male_suit">Мужчина — костюм</option>
+                <option value="female_alternative">Женщина — альтернативный образ</option>
+                <option value="female_dress">Женщина — платье</option>
               </select>
             </label>
             <p id="auth-message" class="message"></p>

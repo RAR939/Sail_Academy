@@ -107,3 +107,15 @@ def test_console_grant_and_revoke(tmp_path, monkeypatch, capsys):
     asyncio.run(console.main())
     assert access.admin_ids() == set()
     asyncio.run(engine.dispose())
+
+
+def test_race_settings_apply_to_new_rooms(editor):
+    from app.game.room_manager import RoomManager
+    client, user = editor
+    access.write_admin_ids({user.id})
+    initial = client.get('/api/admin/world').json()
+    initial['world']['race'] = {'countdownSeconds': 120, 'maxPlayers': 2}
+    assert client.put('/api/admin/world', json={'world': initial['world'], 'revision': initial['revision']}).status_code == 200
+    race = RoomManager().create_race_room()
+    assert race.race_countdown == 120 and race.race_max_players == 2
+    assert race.lobby_snapshot(0)['maxPlayers'] == 2

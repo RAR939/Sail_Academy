@@ -1,9 +1,10 @@
 import defaults from "../../../shared/world/hub.json";
 export type Vec3 = [number, number, number];
-export interface NpcConfig { id: string; name: string; role: string; color: string; x: number; z: number; skin: string }
+export interface NpcConfig { id: string; name: string; role: string; color: string; x: number; z: number; skin: string; style?: string | null; facts?: string | null }
 export interface WorldConfig {
   version: number;
   player: { walkSpeed: number; runSpeed: number; acceleration: number; braking: number; gravity: number; turnSpeed: number };
+  race: { countdownSeconds: number; maxPlayers: number };
   camera: { distance: number; minDistance: number; maxDistance: number; height: number; beta: number; followSpeed: number; manualDelay: number };
   environment: { sky: string; fogStart: number; fogEnd: number; lightIntensity: number; sea: { width: number; height: number; position: Vec3 }; materials: Record<string, string> };
   boxes: Array<{ name: string; size: Vec3; position: Vec3; material: string; collision: boolean; visible: boolean }>;

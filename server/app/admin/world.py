@@ -81,7 +81,9 @@ class NPC(StrictModel):
     color: str = Field(pattern=r'^#[0-9a-fA-F]{6}$')
     x: float = Field(ge=-200, le=200)
     z: float = Field(ge=-200, le=200)
-    skin: str = Field(pattern=r'^(skaterMaleA|skaterFemaleA|criminalMaleA|cyborgFemaleA)$')
+    skin: str = Field(pattern=r'^(skaterMaleA|skaterFemaleA|criminalMaleA|cyborgFemaleA|male_shirt|male_suit|female_alternative|female_dress)$')
+    style: str | None = Field(default=None, max_length=500)
+    facts: str | None = Field(default=None, max_length=2000)
 
 class Sea(StrictModel):
     width: float = Field(gt=0, le=2000)
@@ -109,9 +111,14 @@ class Special(StrictModel):
     bow: SpecialPart
     sail: SpecialPart
 
+class RaceConfig(StrictModel):
+    countdownSeconds: int = Field(default=180, ge=60, le=1800)
+    maxPlayers: int = Field(default=4, ge=1, le=4)
+
 class World(StrictModel):
     version: int = Field(ge=1, le=1)
     player: PlayerConfig
+    race: RaceConfig = Field(default_factory=RaceConfig)
     camera: CameraConfig
     environment: Environment
     boxes: list[Box] = Field(min_length=1, max_length=500)
