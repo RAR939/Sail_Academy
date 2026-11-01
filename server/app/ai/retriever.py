@@ -41,6 +41,15 @@ def is_gameplay_question(question):
     return race and action
 
 
+def needs_previous_question(question):
+    """Use the preceding question only for genuinely context-dependent follow-ups."""
+    text = ' '.join(question.casefold().replace('ё', 'е').split()).strip(' .!?…')
+    if re.match(r'^(?:а\s+)?(?:это|этот|эта|эти|он|она|оно|они|его|ее|их)\b', text):
+        return True
+    return bool(re.fullmatch(
+        r'(?:а\s+)?(?:(?:почему|зачем|как|что|кто|где|когда|откуда|сколько)(?:\s+(?:это|так|он|она|оно|они|там|тогда))?|подробнее|расскажи подробнее|поясни|объясни)', text))
+
+
 def has_topic_overlap(question, text):
     """Avoid returning unrelated game-manual fragments on weak vector matches."""
     words = re.findall(r'[а-яёa-z]{4,}', question.casefold().replace('ё', 'е'))
@@ -125,10 +134,10 @@ def _search(vector, npc_id, path, top_k, threshold, question=None):
 
 
 async def retrieve(question: str, npc_id: str, history: list[dict] | None = None) -> tuple[list[dict], dict]:
-    # Previous user turn helps resolve short follow-up questions.
+    # A short standalone question should never inherit an unrelated prior turn.
     previous = next((m['content'] for m in reversed(history or []) if m.get('role') == 'user'), '')
     query = (f'{previous}\n{question}'
-             if previous and len(question.split()) <= 4 and not is_gameplay_question(question)
+             if previous and needs_previous_question(question)
              else question)
     start = time.perf_counter()
     vector = (await embed(['search_query: ' + query]))[0]

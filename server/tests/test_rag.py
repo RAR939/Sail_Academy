@@ -120,6 +120,10 @@ def test_query_embedding_search_and_deduplication(tmp_path, monkeypatch):
         assert vest[0]['category'] == 'weather_safety'
         await retriever.retrieve('Как пройти гонку?', 'judge', [{'role': 'user', 'content': 'Что такое правило 10?'}])
         assert requests[-1] == 'search_query: Как пройти гонку?'
+        await retriever.retrieve('Что такое швартов?', 'sailor', [{'role': 'user', 'content': 'тупой ты'}])
+        assert requests[-1] == 'search_query: Что такое швартов?'
+        await retriever.retrieve('А зачем?', 'sailor', [{'role': 'user', 'content': 'Что такое швартов?'}])
+        assert requests[-1] == 'search_query: Что такое швартов?\nА зачем?'
         with pytest.raises(FileNotFoundError):
             await indexer.update_index(tmp_path / 'missing', path)
         assert retriever._search([1, 0], 'captain', path, 4, .73)
@@ -258,6 +262,66 @@ def test_gameplay_questions_do_not_mask_explicit_rules_questions():
     assert not retriever.is_gameplay_question('Кто должен уступить на правом галсе?')
     assert not retriever.has_topic_overlap('Как приготовить пиццу?', 'Как пройти дистанцию в игровой гонке')
     assert retriever.has_topic_overlap('Как работает шверт?', 'Шверт уменьшает боковой снос.')
+
+
+def test_repetition_is_retried_without_losing_history(monkeypatch):
+    old = 'Ветер вдруг всплеснул как у бабы с бородой и снова подул.'
+    history = [{'role': 'user', 'content': 'Привет'}, {'role': 'assistant', 'content': old}]
+    calls = []
+
+    async def retrieve(*args): return [], {}
+    async def run_sync(fn, *args): return fn(*args)
+    def generate(messages):
+        calls.append([dict(message) for message in messages])
+        return old if len(calls) == 1 else 'Не понял тебя. Уточни, пожалуйста.'
+
+    monkeypatch.setattr(service, 'retrieve', retrieve)
+    monkeypatch.setattr(service, 'generate_local', generate)
+    monkeypatch.setattr(service.asyncio, 'to_thread', run_sync)
+    result, backend, _ = asyncio.run(service.answer('sailor', 'Как дела?', history, '', False))
+    assert backend == 'ollama' and result == 'Не понял тебя. Уточни, пожалуйста.'
+    assert len(calls) == 2
+    assert calls[1][-2] == history[0] and calls[1][-1]['content'] == 'Как дела?'
+    assert all(message['role'] != 'assistant' for message in calls[1])
+    assert 'повторял старую фразу' in calls[1][0]['content']
+
+
+def test_repetition_check_allows_exact_sourced_fact():
+    fact = 'Поворот носом через направление ветра называется поворотом оверштаг.'
+    history = [{'role': 'assistant', 'content': fact}]
+    assert service.repeats_old_phrase(fact, history, '')
+    assert not service.repeats_old_phrase(fact, history, fact)
+
+
+def test_unintelligible_input_does_not_recycle_old_story(monkeypatch):
+    captured = []
+    async def retrieve(*args):
+        return [{'id': 'x', 'text': 'Погода.', 'source': 'x', 'category': 'general', 'score': .9}], {}
+    async def run_sync(fn, *args): return fn(*args)
+    def generate(messages):
+        captured.extend(messages)
+        return 'Не понял тебя, уточни.'
+    monkeypatch.setattr(service, 'retrieve', retrieve)
+    monkeypatch.setattr(service, 'generate_local', generate)
+    monkeypatch.setattr(service.asyncio, 'to_thread', run_sync)
+    text, _, rag = asyncio.run(service.answer('sailor', 'хххх', [
+        {'role': 'user', 'content': 'Привет'},
+        {'role': 'assistant', 'content': 'Придуманная погода'},
+    ], '', False))
+    assert text == 'Не понял тебя, уточни.' and not rag['used']
+    assert [item['role'] for item in captured] == ['system', 'user']
+    assert 'Погода.' not in captured[0]['content']
+
+
+def test_repeated_output_after_retry_is_not_reported_as_success(monkeypatch):
+    old = 'Ветер вдруг всплеснул как у бабы с бородой и снова подул.'
+    async def retrieve(*args): return [], {}
+    async def run_sync(fn, *args): return fn(*args)
+    monkeypatch.setattr(service, 'retrieve', retrieve)
+    monkeypatch.setattr(service, 'generate_local', lambda _: old)
+    monkeypatch.setattr(service.asyncio, 'to_thread', run_sync)
+    with pytest.raises(service.AIUnavailable):
+        asyncio.run(service.answer('sailor', 'Как дела?', [{'role': 'assistant', 'content': old}], '', False))
 
 
 @pytest.mark.skipif(os.environ.get('RUN_OLLAMA_INTEGRATION') != '1', reason='requires local Ollama models and indexed knowledge')
