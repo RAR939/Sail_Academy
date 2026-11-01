@@ -19,6 +19,10 @@ class Room:
     race_start_at: float | None = None
     race_countdown: int = 180
     race_max_players: int = 4
+    race_database_id: int | None = None
+    race_results: dict[int, dict] = field(default_factory=dict)
+    saved_results: tuple = field(default_factory=tuple, repr=False)
+    boat_contacts: set[tuple[int, int]] = field(default_factory=set, repr=False)
 
     created_at: float = field(default_factory=time.time)
 
@@ -45,6 +49,11 @@ class Room:
                 self.races[player.user_id] = RaceProgress()
 
     def remove_player(self, user_id: int) -> PlayerState | None:
+        if self.race_start_at is not None and user_id in self.players:
+            race = self.races.get(user_id)
+            self.race_results[user_id] = {"id": user_id, "name": self.players[user_id].username,
+                "phase": "completed" if race and race.finished_in is not None else "retired",
+                "elapsed": race.finished_in if race else None, "individualRecall": False}
         self.boats.pop(user_id, None)
         self.races.pop(user_id, None)
         player = self.players.pop(user_id, None)
@@ -63,7 +72,7 @@ class Room:
 
     def lobby_snapshot(self, now: float) -> dict:
         phase = "waiting" if self.race_start_at is None else ("countdown" if now < self.race_start_at else "racing")
-        results = []
+        results = list(self.race_results.values())
         for user_id, player in self.players.items():
             race = self.races.get(user_id)
             results.append({"id": user_id, "name": player.username, "phase": race.phase if race else "start", "elapsed": race.finished_in if race else None, "individualRecall": race.individual_recall if race else False})

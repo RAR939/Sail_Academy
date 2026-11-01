@@ -1,5 +1,5 @@
 """Server-owned trapezoid training course with directional mark rounding."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 import time
 
@@ -104,6 +104,46 @@ class RaceProgress:
     start_signal_at: float | None = None
     start_checked: bool = False
     individual_recall: bool = False
+    rounding_warning: bool = False
+    penalty_turns: int = 0
+    penalty_reason: str = ""
+    penalty_angle: float = 0.0
+    penalty_tack: bool = False
+    penalty_gybe: bool = False
+    touching_marks: set = field(default_factory=set, repr=False)
+
+    def add_penalty(self, turns: int, reason: str):
+        self.penalty_turns += turns
+        self.penalty_reason = reason
+        self.penalty_angle = 0.0
+        self.penalty_tack = self.penalty_gybe = False
+
+    def update_penalty(self, before: float, after: float, wind: float, clear: bool):
+        if not self.penalty_turns:
+            return
+        if not clear:
+            self.penalty_angle = 0.0
+            self.penalty_tack = self.penalty_gybe = False
+            return
+        turn = math.atan2(math.sin(after-before), math.cos(after-before))
+        if abs(turn) < 1e-8:
+            return
+        if self.penalty_angle * turn < -1e-8:
+            self.penalty_angle = 0.0
+            self.penalty_tack = self.penalty_gybe = False
+        old_rel = math.atan2(math.sin(before-wind), math.cos(before-wind))
+        new_rel = math.atan2(math.sin(after-wind), math.cos(after-wind))
+        if old_rel * new_rel <= 0 and abs(old_rel-new_rel) < math.pi:
+            self.penalty_tack = True
+        if abs(old_rel-new_rel) > math.pi:
+            self.penalty_gybe = True
+        self.penalty_angle += turn
+        if abs(self.penalty_angle) >= 2*math.pi - 0.02 and self.penalty_tack and self.penalty_gybe:
+            self.penalty_turns -= 1
+            self.penalty_angle = 0.0
+            self.penalty_tack = self.penalty_gybe = False
+            if not self.penalty_turns:
+                self.penalty_reason = ""
 
     def apply_start_signal(self, position: tuple[float, float], heading: float) -> None:
         if self.start_checked:
@@ -128,10 +168,13 @@ class RaceProgress:
             if self.mark_approached and crossed_rounding_gate(before, after, self.next_mark):
                 self.next_mark += 1
                 self.mark_approached = False
+                self.rounding_warning = False
                 if self.next_mark == len(MARKS): self.phase = "finish"
+            elif crossed_rounding_gate(after, before, self.next_mark):
+                self.rounding_warning = True
             elif math.hypot(after[0]-mark[0], after[1]-mark[1]) > MARK_RADIUS*2:
                 self.mark_approached = False
-        elif self.phase == "finish" and crossed_line(before, after, 1, 0.0, FINISH_LINE[0][0], FINISH_LINE[1][0]):
+        elif self.phase == "finish" and not self.penalty_turns and crossed_line(before, after, 1, 0.0, FINISH_LINE[0][0], FINISH_LINE[1][0]):
             self.phase = "completed"
             self.finished_in = max(0.0, now - self.started_at) if self.started_at is not None else 0.0
 
@@ -140,4 +183,4 @@ class RaceProgress:
         clock_start = self.started_at if self.started_at is not None else self.start_signal_at
         elapsed = self.finished_in if self.finished_in is not None else (max(0.0, now-clock_start) if clock_start is not None else 0.0)
         gate = rounding_gate(self.next_mark)[0] if self.phase == "marks" else None
-        return {"phase":self.phase, "nextMark":self.next_mark, "elapsed":round(elapsed,2), "marks":[list(m) for m in MARKS], "markRadius":MARK_RADIUS, "startLine":[list(p) for p in START_LINE], "finishLine":[list(p) for p in FINISH_LINE], "markSide":"port", "roundingGate":list(gate) if gate else None, "markApproached":self.mark_approached, "individualRecall":self.individual_recall}
+        return {"phase":self.phase, "nextMark":self.next_mark, "elapsed":round(elapsed,2), "marks":[list(m) for m in MARKS], "markRadius":MARK_RADIUS, "startLine":[list(p) for p in START_LINE], "finishLine":[list(p) for p in FINISH_LINE], "markSide":"port", "roundingGate":list(gate) if gate else None, "markApproached":self.mark_approached, "individualRecall":self.individual_recall, "roundingWarning": self.rounding_warning, "penaltyTurns": self.penalty_turns, "penaltyReason": self.penalty_reason, "penaltyProgress": min(1.0, abs(self.penalty_angle)/(2*math.pi))}

@@ -130,6 +130,10 @@ export interface RaceStateMessage {
   roundingGate: [number, number] | null;
   markApproached: boolean;
   individualRecall: boolean;
+  roundingWarning: boolean;
+  penaltyTurns: number;
+  penaltyReason: string;
+  penaltyProgress: number;
 }
 
 export interface RaceLobbyMessage {

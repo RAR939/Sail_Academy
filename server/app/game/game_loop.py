@@ -6,6 +6,8 @@ from app.game.constants import TICK_INTERVAL
 from app.game.room_manager import room_manager
 from app.game.boat_physics import BoatPhysics
 from app.world.wind import WindState
+from app.game.race_results import save_race_results
+from app.game.race_judging import update_judging
 
 from app.websocket.manager import manager
 
@@ -64,8 +66,15 @@ class GameLoop:
                 continue
 
             now = time.monotonic()
-            # Во время отсчёта лодки свободно маневрируют.
-            for user_id, boat in room.boats.items():
+            if room.room_type == "race" and room.race_start_at is not None and room.race_database_id is None:
+                try:
+                    await save_race_results(room)
+                except Exception:
+                    logger.exception("Could not save race start for %s", room.room_id)
+            # First move every boat, then judge their common positions.
+            previous_headings = {uid: boat.heading for uid, boat in room.boats.items()}
+            movements = {}
+            for user_id, boat in list(room.boats.items()):
                 if room.room_type != "race" or room.race_start_at is None:
                     continue
                 race = room.races.get(user_id)
@@ -84,7 +93,24 @@ class GameLoop:
                 before = (boat.x, boat.z)
                 if step:
                     BoatPhysics.update(boat, self.wind, step)
-                race.update(before, (boat.x, boat.z), now, boat.heading)
+                movements[user_id] = (before, (boat.x, boat.z), boat.heading)
+
+            if room.room_type == "race" and room.race_start_at is not None:
+                update_judging(room, self.wind.direction, previous_headings)
+                for user_id, (before, after, heading) in movements.items():
+                    race = room.races.get(user_id)
+                    if race:
+                        race.update(before, after, now, heading)
+
+            if room.room_type == "race" and room.race_database_id is not None:
+                finished = [(uid, race.finished_in) for uid, race in room.races.items() if race.finished_in is not None]
+                finished += [(item["id"], item["elapsed"]) for item in room.race_results.values() if item["elapsed"] is not None]
+                finished.sort(key=lambda item: item[1])
+                if tuple(finished) != room.saved_results:
+                    try:
+                        await save_race_results(room)
+                    except Exception:
+                        logger.exception("Could not save race results for %s", room.room_id)
 
             # Формируем обновление состояния игроков.
             players_delta = []

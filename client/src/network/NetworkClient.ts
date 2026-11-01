@@ -29,6 +29,13 @@ export interface NetworkClientOptions {
  * Авторизация — первым JSON-сообщением после открытия WebSocket.
  */
 export class NetworkClient {
+  private raceHistoryUrl = "";
+  private raceHistoryToken = "";
+  public async raceHistory(): Promise<Array<{ name: string; startedAt: string | null; players: Array<{ name: string; place: number | null; elapsed: number | null }> }>> {
+    const response = await fetch(this.raceHistoryUrl, { headers: { Authorization: `Bearer ${this.raceHistoryToken}` } });
+    if (!response.ok) throw new Error("Не удалось загрузить историю гонок");
+    return response.json();
+  }
   private socket: WebSocket | null = null;
   private status: NetworkStatus = "disconnected";
   private pingTimer: number | null = null;
@@ -97,6 +104,9 @@ export class NetworkClient {
     if (!token.trim()) {
       return Promise.reject(new Error("JWT access token не задан"));
     }
+
+    const endpoint = new URL(url); endpoint.protocol = endpoint.protocol === "wss:" ? "https:" : "http:"; endpoint.pathname = "/api/races/history"; endpoint.search = "";
+    this.raceHistoryUrl = endpoint.toString(); this.raceHistoryToken = token;
 
     this.setStatus("connecting");
 
