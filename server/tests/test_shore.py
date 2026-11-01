@@ -173,6 +173,26 @@ def test_vest_can_be_removed_and_put_back_without_resetting_story(game):
     assert client.get("/api/story").json()["has_vest"]
 
 
+def test_memory_isolated_by_user_and_npc(game, monkeypatch):
+    client, player = game
+    captured = []
+    def generate(messages):
+        captured.append(messages)
+        return 'Ответ наставника.'
+    monkeypatch.setattr(service, 'generate_local', generate)
+    player.x, player.z = shore.NPCS['sailor']['position']
+    assert client.post('/api/ai/dialog', json={'npc_id': 'sailor', 'text': 'Мой особый вопрос'}).status_code == 200
+    talk(client, player, 'judge')
+    assert not any(m.get('content') == 'Мой особый вопрос' for m in captured[-1])
+    credentials = {'username': 'another_tester', 'password': 'test-only-password'}
+    user_id = client.post('/api/auth/register', json=credentials).json()['id']
+    client.headers['Authorization'] = 'Bearer ' + client.post('/api/auth/login', json=credentials).json()['access_token']
+    other = PlayerState(user_id=user_id, username='another_tester')
+    room_manager.add_player(other, 'hub')
+    talk(client, other, 'sailor')
+    assert not any(m.get('content') == 'Мой особый вопрос' for m in captured[-1])
+
+
 def test_admin_player_list_and_selective_rights(game, tmp_path, monkeypatch):
     from app.admin import access
     client, player = game
@@ -196,23 +216,3 @@ def test_admin_player_list_and_selective_rights(game, tmp_path, monkeypatch):
     assert client.put(f"/api/admin/players/{player.user_id}/rights", json={"admin": False}).status_code == 400
     assert client.put(f"/api/admin/players/{other_id}/rights", json={"admin": False}).status_code == 200
     assert access.admin_ids() == {player.user_id}
-
-
-def test_memory_isolated_by_user_and_npc(game, monkeypatch):
-    client, player = game
-    captured = []
-    def generate(messages):
-        captured.append(messages)
-        return 'Ответ наставника.'
-    monkeypatch.setattr(service, 'generate_local', generate)
-    player.x, player.z = shore.NPCS['sailor']['position']
-    assert client.post('/api/ai/dialog', json={'npc_id': 'sailor', 'text': 'Мой особый вопрос'}).status_code == 200
-    talk(client, player, 'judge')
-    assert not any(m.get('content') == 'Мой особый вопрос' for m in captured[-1])
-    credentials = {'username': 'another_tester', 'password': 'test-only-password'}
-    user_id = client.post('/api/auth/register', json=credentials).json()['id']
-    client.headers['Authorization'] = 'Bearer ' + client.post('/api/auth/login', json=credentials).json()['access_token']
-    other = PlayerState(user_id=user_id, username='another_tester')
-    room_manager.add_player(other, 'hub')
-    talk(client, other, 'sailor')
-    assert not any(m.get('content') == 'Мой особый вопрос' for m in captured[-1])
