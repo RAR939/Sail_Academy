@@ -9,6 +9,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.api.auth import router as auth_router
+from app.api.shore import router as shore_router
+from app.database.connection import init_db, close_db
 from app.websocket.router import router as websocket_router
 from app.game.game_loop import game_loop
 
@@ -21,12 +23,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parents[2]
-CLIENT_DIR = BASE_DIR / "client"
+CLIENT_DIR = BASE_DIR / "client" / "dist"
 ASSETS_DIR = CLIENT_DIR / "assets"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await init_db()
     logger.info("%s starting...", settings.APP_NAME)
     logger.info("Version: %s", settings.APP_VERSION)
 
@@ -49,6 +52,7 @@ async def lifespan(app: FastAPI):
             await game_task
 
         logger.info("Server shut down.")
+        await close_db()
 
 
 app = FastAPI(
@@ -68,6 +72,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(auth_router)
+app.include_router(shore_router)
 app.include_router(websocket_router)
 
 
@@ -100,3 +105,7 @@ if ASSETS_DIR.exists():
         StaticFiles(directory=ASSETS_DIR),
         name="assets"
     )
+
+# Public files copied by Vite (for example the login background) live at the root.
+if CLIENT_DIR.exists():
+    app.mount("/", StaticFiles(directory=CLIENT_DIR, html=True), name="client")

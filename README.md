@@ -1,4 +1,8 @@
-# Sail Academy — экран входа
+# Sail Academy — береговой прототип
+
+Актуальная версия: Babylon.js-клиент в `client/`, FastAPI-сервер в `server/`.
+Береговой маршрут, NPC, локальный ИИ и запуск описаны в [docs/shore-demo.md](docs/shore-demo.md).
+Команды ниже относятся к старому отдельному прототипу экрана входа (`main.py`).
 
 ## Запуск на Windows PowerShell
 

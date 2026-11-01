@@ -113,6 +113,7 @@ export class NetworkLoginOverlay {
     `;
 
     document.body.append(this.root);
+    this.root.querySelector<HTMLInputElement>("#server-url")!.value = window.location.origin;
     this.root.addEventListener("keydown", this.stopGameKeyboard);
     this.root.addEventListener("keyup", this.stopGameKeyboard);
 
