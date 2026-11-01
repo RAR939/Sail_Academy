@@ -9,3 +9,8 @@
 Дополнительно индексируется PDF `../ai/sail_ai/resources/PPG_2025_2028.pdf`
 с номерами страниц. В нём есть редакторские правки; извлечённый текст требует
 сверки с оригиналом. Для обработки PDF необходим установленный PyMuPDF.
+
+`general/boat_and_race.txt` описывает учебную лодку и прохождение игровой
+дистанции по материалам `client/src/world/TrainingDinghy.ts`,
+`client/src/scenes/RaceScene.ts`, `server/app/game/room.py` и
+`server/app/game/race.py`; при изменении модели или механики сверяйте этот файл.

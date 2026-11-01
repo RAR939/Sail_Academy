@@ -29,6 +29,28 @@ def is_rules_question(question):
     ))
 
 
+def is_gameplay_question(question):
+    """Route game-course instructions away from unrelated racing-rule excerpts."""
+    text = question.casefold().replace('ё', 'е')
+    if any(word in text for word in ('правил', 'ппг', 'уступ', 'сторон', 'протест', 'право дорог', 'штраф')):
+        return False
+    if any(word in text for word in ('игр', 'sail academy', 'сейл академ')):
+        return True
+    race = any(word in text for word in ('гонк', 'дистанц', 'старт', 'финиш'))
+    action = any(word in text for word in ('пройти', 'проход', 'начать', 'заверш', 'как', 'управл', 'финишир'))
+    return race and action
+
+
+def has_topic_overlap(question, text):
+    """Avoid returning unrelated game-manual fragments on weak vector matches."""
+    words = re.findall(r'[а-яёa-z]{4,}', question.casefold().replace('ё', 'е'))
+    terms = {word[:min(6, max(4, len(word) - 2))] for word in words if word not in STOP_WORDS}
+    if any(word.startswith(('ветр', 'ветер')) for word in words):
+        terms.add('вет')
+    normalized = text.casefold().replace('ё', 'е')
+    return bool(terms and any(re.search(r'\b' + re.escape(term), normalized) for term in terms))
+
+
 def pdf_relevance(question, text):
     """Require topical evidence in PDF text; embeddings still rank matches."""
     words = re.findall(r'[а-яёa-z]{4,}', question.casefold().replace('ё', 'е'))
@@ -60,6 +82,8 @@ def _search(vector, npc_id, path, top_k, threshold, question=None):
     norm = math.sqrt(sum(x*x for x in vector))
     found = []
     for ident, source, category, text, raw in rows:
+        if question and source == 'general/boat_and_race.txt' and not has_topic_overlap(question, text):
+            continue
         other = json.loads(raw)
         if len(other) != len(vector):
             continue
@@ -67,7 +91,7 @@ def _search(vector, npc_id, path, top_k, threshold, question=None):
         if not magnitude:
             continue
         score = sum(a*b for a, b in zip(vector, other)) / (norm * magnitude)
-        if question and source.lower().endswith('.pdf') and not is_rules_question(question):
+        if question and source.lower().endswith('.pdf') and (not is_rules_question(question) or is_gameplay_question(question)):
             continue
         lexical_bonus = pdf_relevance(question, text) if question and source.lower().endswith('.pdf') else 0.0
         if lexical_bonus is None:
@@ -103,9 +127,11 @@ def _search(vector, npc_id, path, top_k, threshold, question=None):
 async def retrieve(question: str, npc_id: str, history: list[dict] | None = None) -> tuple[list[dict], dict]:
     # Previous user turn helps resolve short follow-up questions.
     previous = next((m['content'] for m in reversed(history or []) if m.get('role') == 'user'), '')
-    query = f'{previous}\n{question}' if previous and len(question.split()) <= 4 else question
+    query = (f'{previous}\n{question}'
+             if previous and len(question.split()) <= 4 and not is_gameplay_question(question)
+             else question)
     start = time.perf_counter()
     vector = (await embed(['search_query: ' + query]))[0]
     embedded = time.perf_counter()
-    results = await asyncio.to_thread(_search, vector, npc_id, settings.RAG_INDEX_PATH, settings.RAG_TOP_K, settings.RAG_MIN_SIMILARITY, question)
+    results = await asyncio.to_thread(_search, vector, npc_id, settings.RAG_INDEX_PATH, settings.RAG_TOP_K, settings.RAG_MIN_SIMILARITY, query)
     return results, {'embedding_ms': round((embedded-start)*1000), 'search_ms': round((time.perf_counter()-embedded)*1000)}

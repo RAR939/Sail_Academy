@@ -118,6 +118,8 @@ def test_query_embedding_search_and_deduplication(tmp_path, monkeypatch):
         assert all(t.startswith('search_document: ') for t in requests[:-1])
         vest, _ = await retriever.retrieve('спасательный жилет', 'weather')
         assert vest[0]['category'] == 'weather_safety'
+        await retriever.retrieve('Как пройти гонку?', 'judge', [{'role': 'user', 'content': 'Что такое правило 10?'}])
+        assert requests[-1] == 'search_query: Как пройти гонку?'
         with pytest.raises(FileNotFoundError):
             await indexer.update_index(tmp_path / 'missing', path)
         assert retriever._search([1, 0], 'captain', path, 4, .73)
@@ -245,4 +247,34 @@ def test_real_rules_pdf_used_without_citations_in_reply():
         assert any(source.get('page') == 18 and source['source'] == indexer.PDF_SOURCE for source in rag['sources'])
         hits, _ = await retriever.retrieve('Как приготовить пиццу?', 'judge')
         assert not hits
+    asyncio.run(run())
+
+
+def test_gameplay_questions_do_not_mask_explicit_rules_questions():
+    assert retriever.is_gameplay_question('Как пройти дистанцию в игровой гонке?')
+    assert retriever.is_gameplay_question('Как пройти гонку?')
+    assert retriever.is_gameplay_question('Как управлять лодкой во время гонки?')
+    assert not retriever.is_gameplay_question('Какое правило 10 действует в игре?')
+    assert not retriever.is_gameplay_question('Кто должен уступить на правом галсе?')
+    assert not retriever.has_topic_overlap('Как приготовить пиццу?', 'Как пройти дистанцию в игровой гонке')
+    assert retriever.has_topic_overlap('Как работает шверт?', 'Шверт уменьшает боковой снос.')
+
+
+@pytest.mark.skipif(os.environ.get('RUN_OLLAMA_INTEGRATION') != '1', reason='requires local Ollama models and indexed knowledge')
+def test_real_gameplay_and_boat_material_retrieval():
+    async def run():
+        for npc, question, words in [
+            ('captain', 'Из каких частей состоит учебная лодка?', ('мачта', 'шверт')),
+            ('captain', 'Что такое шверт и зачем он нужен?', ('шверт',)),
+            ('judge', 'Как пройти дистанцию в игровой гонке?', ('четыре', 'финиш')),
+            ('judge', 'Как управлять лодкой во время гонки?', ('клавиш', 'шкот')),
+        ]:
+            hits, _ = await retriever.retrieve(question, npc)
+            found = [hit for hit in hits if hit['source'] == 'general/boat_and_race.txt']
+            assert found, (question, hits)
+            text = ' '.join(hit['text'].lower() for hit in found)
+            assert all(word in text for word in words), (question, text)
+            assert not any(hit['source'].endswith('.pdf') for hit in hits)
+        rules, _ = await retriever.retrieve('Что говорит правило 10 о противоположных галсах?', 'judge')
+        assert any(hit['source'].endswith('PPG_2025_2028.pdf') for hit in rules)
     asyncio.run(run())
