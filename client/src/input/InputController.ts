@@ -19,6 +19,7 @@ const GAME_KEYS = new Set([
 export class InputController {
   private readonly pressed = new Set<string>();
   private enabled = true;
+  private interactionQueued = false;
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     if (!this.enabled || !GAME_KEYS.has(event.code)) {
@@ -26,6 +27,7 @@ export class InputController {
     }
 
     event.preventDefault();
+    if (event.code === "KeyE" && !this.pressed.has(event.code)) this.interactionQueued = true;
     this.pressed.add(event.code);
   };
 
@@ -40,6 +42,7 @@ export class InputController {
 
   private readonly onWindowBlur = (): void => {
     this.pressed.clear();
+    this.interactionQueued = false;
   };
 
   public constructor() {
@@ -74,11 +77,13 @@ export class InputController {
       movement.normalize();
     }
 
+    const interactPressed = this.interactionQueued || this.isPressed("KeyE");
+    this.interactionQueued = false;
     return {
       moveX: movement.x,
       moveZ: movement.z,
       run: this.isPressed("ShiftLeft") || this.isPressed("ShiftRight"),
-      interactPressed: this.isPressed("KeyE"),
+      interactPressed,
     };
   }
 
@@ -87,6 +92,7 @@ export class InputController {
 
     if (!enabled) {
       this.pressed.clear();
+      this.interactionQueued = false;
     }
   }
 

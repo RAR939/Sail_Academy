@@ -39,7 +39,6 @@ export class Game {
     this.unsubscribeNetworkStatus = this.network.onStatus((status) => {
       if (status === "connected") {
         this.hasConnectedOnce = true;
-        this.loginOverlay.hide();
         console.info("[NetworkClient] Подключено к Sail Academy");
         return;
       }
@@ -122,7 +121,12 @@ private readonly authenticate = async (
     wsUrl.toString(),
     login.access_token
   );
-
+  try {
+    await this.hubScene.enter(baseUrl, login.access_token);
+  } catch (error) {
+    this.network.disconnect();
+    throw error;
+  }
   this.loginOverlay.hide();
 };
 

@@ -1,0 +1,147 @@
+import asyncio
+import json
+import math
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.ai.content import NPCS, STEPS, STORY_REPLIES
+from app.ai.service import answer
+from app.database.connection import get_db
+from app.database.models import NPCMemory, Progress, User
+from app.game.room_manager import room_manager
+from app.security.dependencies import get_current_user
+
+router = APIRouter(prefix="/api", tags=["Shore lesson"])
+story_lock = asyncio.Lock()
+dialogue_lock = asyncio.Lock()
+COURSE = "shore_intro"
+
+
+class InteractionRequest(BaseModel):
+    target: str = Field(min_length=1, max_length=32)
+
+
+class DialogRequest(BaseModel):
+    npc_id: str = Field(min_length=1, max_length=32)
+    text: str = Field(min_length=1, max_length=600)
+
+
+async def progress_row(session: AsyncSession, user_id: int) -> Progress:
+    result = await session.execute(select(Progress).execution_options(populate_existing=True).where(
+        Progress.user_id == user_id, Progress.course_id == COURSE, Progress.lesson_id == "first_day"
+    ))
+    row = result.scalar_one_or_none()
+    if row is None:
+        row = Progress(user_id=user_id, course_id=COURSE, lesson_id="first_day", status=STEPS[0][0])
+        session.add(row)
+        await session.flush()
+    return row
+
+
+def index_of(row: Progress) -> int:
+    return next((i for i, step in enumerate(STEPS) if step[0] == row.status), 0)
+
+
+def snapshot(row: Progress) -> dict:
+    index = index_of(row)
+    step_id, title, description, target, (x, z) = STEPS[index]
+    return {
+        "step": step_id, "index": index, "total": len(STEPS) - 1,
+        "title": title, "description": description,
+        "target": target, "position": {"x": x, "z": z},
+        "has_vest": index >= 3, "completed": step_id == "completed",
+    }
+
+
+def require_near(user_id: int, position: tuple[float, float]):
+    room = room_manager.get_player_room(user_id)
+    player = room.get_player(user_id) if room else None
+    if not player or room.room_id != "hub":
+        raise HTTPException(409, "Сначала войдите в береговой хаб.")
+    if math.hypot(player.x - position[0], player.z - position[1]) > 4:
+        raise HTTPException(409, "Подойдите ближе к персонажу или предмету.")
+
+
+@router.get("/story")
+async def get_story(user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
+    async with story_lock:
+        row = await progress_row(session, user.id)
+        result = snapshot(row)
+        await session.commit()
+        return result
+
+
+@router.post("/story/interact")
+async def interact(data: InteractionRequest, user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
+    if data.target not in ("vest", "pier"):
+        raise HTTPException(400, "Неизвестный предмет.")
+    position = (15, 5) if data.target == "vest" else (-14, -26)
+    require_near(user.id, position)
+    async with story_lock:
+        row = await progress_row(session, user.id)
+        index = index_of(row)
+        advanced = STEPS[index][3] == data.target
+        if advanced:
+            row.status = STEPS[index + 1][0]
+        state = snapshot(row)
+        await session.commit()
+    if advanced:
+        message = ("Жилет подобран по размеру и застёгнут. Теперь найдите судью Анну." if data.target == "vest"
+                   else "Вы осмотрели нос, корму, парус и румпель учебной лодки. На воду сегодня не выходим. Вернитесь к капитану.")
+    else:
+        message = "Сначала выполните текущее задание: " + state["description"]
+    return {"story": state, "text": message}
+
+
+@router.post("/ai/dialog")
+async def dialog(data: DialogRequest, user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
+    npc = NPCS.get(data.npc_id)
+    if npc is None:
+        raise HTTPException(404, "Такого наставника нет.")
+    if not data.text.strip():
+        raise HTTPException(422, "Введите вопрос.")
+    require_near(user.id, npc["position"])
+    # Bound queueing as well as model time; serialize memory updates for this demo.
+    try:
+        await asyncio.wait_for(dialogue_lock.acquire(), timeout=2)
+    except TimeoutError:
+        raise HTTPException(429, "Наставник сейчас занят. Попробуйте через несколько секунд.")
+    try:
+        result = await session.execute(select(NPCMemory).where(NPCMemory.user_id == user.id, NPCMemory.npc_id == data.npc_id))
+        memory = result.scalar_one_or_none()
+        try:
+            history = json.loads(memory.memory_text) if memory else []
+            if not isinstance(history, list):
+                history = []
+            history = [message for message in history if isinstance(message, dict)
+                       and message.get("role") in ("user", "assistant") and isinstance(message.get("content"), str)]
+        except (ValueError, TypeError):
+            history = []
+        async with story_lock:
+            row = await progress_row(session, user.id)
+            index = index_of(row)
+            expected = STEPS[index][3] == data.npc_id
+            lesson = STORY_REPLIES.get(STEPS[index][0], "") if expected else ""
+            # Release the DB read transaction before waiting for the model.
+            await session.commit()
+        repeated = any(message.get("role") == "user" and message.get("content", "").casefold() == data.text.strip().casefold() for message in history)
+        text, backend = await answer(data.npc_id, data.text.strip(), history, lesson, repeated)
+        async with story_lock:
+            row = await progress_row(session, user.id)
+            if lesson and index_of(row) == index:
+                row.status = STEPS[index + 1][0]
+            state = snapshot(row)
+            if memory is None:
+                memory = NPCMemory(user_id=user.id, npc_id=data.npc_id)
+                session.add(memory)
+            memory.memory_text = json.dumps([
+                *history[-4:], {"role": "user", "content": data.text.strip()},
+                {"role": "assistant", "content": text},
+            ], ensure_ascii=False)
+            await session.commit()
+        return {"npc_id": data.npc_id, "speaker": npc["name"], "text": text, "backend": backend, "story": state}
+    finally:
+        dialogue_lock.release()
