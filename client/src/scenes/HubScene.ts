@@ -1,4 +1,4 @@
-import { Scene, StandardMaterial, Material, Color3, MeshBuilder, Mesh } from "@babylonjs/core";
+import { Scene, Material } from "@babylonjs/core";
 import { CameraRig } from "../gameplay/CameraRig";
 import { InteractionSystem } from "../gameplay/InteractionSystem";
 import { Player } from "../gameplay/Player";
@@ -14,6 +14,8 @@ import { ShoreHud } from "../ui/ShoreHud";
 import { ShoreEnvironment } from "../world/ShoreEnvironment";
 import type { WorldConfig } from "../world/WorldConfig";
 import { Character } from "../rendering/Character";
+import { LifeJacket } from "../rendering/LifeJacket";
+import { AmbientCrowd } from "../world/AmbientCrowd";
 import { createPropCollider } from "../rendering/PropCollisions";
 import { TransformNode, Vector3 } from "@babylonjs/core";
 
@@ -34,7 +36,9 @@ export class HubScene {
   private lastPlayers: PlayerStateMessage[] = [];
   private readonly npcCharacters: Character[] = [];
   private readonly unsubscribers: Array<() => void> = [];
-  private readonly vest: Mesh;
+  private readonly vest: LifeJacket;
+  private hasVest = false;
+  private readonly crowd: AmbientCrowd;
   private localCharacter: Character | null = null;
   private localUsername = "";
   private localUserId: number | null = null;
@@ -50,6 +54,8 @@ export class HubScene {
     this.environment = new ShoreEnvironment(scene, world);
     this.boatLesson = new BoatLesson(scene, this.environment.dinghy, () => {
       if (this.network.isConnected) this.network.createRace();
+    }, (roomId) => {
+      if (this.network.isConnected) this.network.enterLocation("race_track", roomId);
     });
     this.player = new Player(scene, { id: "local-player", spawn: new Vector3(0, 1.1, 0), ...world.player });
     this.cameraRig = new CameraRig(scene, canvas, {
@@ -65,13 +71,22 @@ export class HubScene {
     this.hint.className = "interaction-hint";
     this.hint.hidden = true;
     document.body.append(this.hint);
-    this.vest = MeshBuilder.CreateBox("player-lifejacket", { width: 0.62, height: 0.64, depth: 0.5 }, scene);
-    this.vest.parent = this.player.collider;
-    this.vest.position.y = 0.18;
-    const vestMaterial = new StandardMaterial("player-vest-material", scene);
-    vestMaterial.diffuseColor = Color3.FromHexString("#f39035");
-    this.vest.material = vestMaterial;
-    this.vest.setEnabled(false);
+    this.vest = new LifeJacket(scene, this.player.collider);
+    this.crowd = new AmbientCrowd(scene, this.assetLoader, this.environment.root);
+    const visitorLines = [
+      "Привет! Сегодня отличный день для тренировки.",
+      "Перед выходом на воду не забудь застегнуть жилет.",
+      "На дистанции следи за ветром и другими лодками.",
+      "Удачи на воде!",
+    ];
+    this.crowd.visitors.forEach((visitor, index) => {
+      this.interactions.register({
+        id: `visitor-${index}`, kind: "npc", anchor: visitor.anchor,
+        prompt: "E — поздороваться", interactionRadius: 2.4,
+        getHighlightMeshes: () => visitor.character.getMeshes(),
+        interact: () => { if (this.ready) this.hud.toast(visitorLines[index % visitorLines.length]!); },
+      });
+    });
     this.input.setEnabled(false);
     this.cameraRig.setEnabled(false);
 
@@ -124,6 +139,7 @@ export class HubScene {
       });
     }
     this.unsubscribers.push(
+      network.on("error", (message) => { if (this.active && this.ready) this.hud.toast(message.message); }),
       network.on("welcome", (message) => {
         this.localUserId = message.user_id;
         this.localUsername = message.username;
@@ -200,7 +216,9 @@ export class HubScene {
       this.cameraRig.update(delta, input.run && this.player.speed > this.world.player.walkSpeed * 0.95, this.player.movementDirection);
       if (!this.chat.isOpen && !this.boatLesson.isOpen && !this.busy) this.interactions.update(this.player);
       const target = this.interactions.current;
-      this.hint.textContent = target?.prompt ?? "";
+      this.hint.textContent = target?.id === "vest"
+        ? (this.hasVest ? "E — снять жилет" : "E — надеть жилет")
+        : target?.prompt ?? "";
       this.hint.hidden = !target || this.chat.isOpen || this.boatLesson.isOpen || this.busy;
       this.hud.update(this.player.collider.position.x, this.player.collider.position.z);
       this.sendAccumulator += delta;
@@ -217,6 +235,7 @@ export class HubScene {
         ]
       : [];
     this.environment.update(delta, nearbyPlayers);
+    this.crowd.update(delta, nearbyPlayers);
   }
 
   public setActive(active: boolean): void {
@@ -230,7 +249,8 @@ export class HubScene {
   private applyStory(story: ShoreStory): void {
     this.hud.setStory(story);
     this.hud.setVisible(this.ready);
-    this.vest.setEnabled(story.has_vest);
+    this.hasVest = story.has_vest;
+    this.vest.setEnabled(this.hasVest);
     this.environment.setTarget(story.position.x, story.position.z, !story.completed && this.ready);
   }
 
@@ -325,7 +345,8 @@ export class HubScene {
     this.interactions.dispose();
     this.input.dispose();
     this.cameraRig.dispose();
-    this.vest.material?.dispose();
+    this.vest.dispose();
+    this.crowd.dispose();
     this.player.dispose();
     this.environment.dispose();
   }

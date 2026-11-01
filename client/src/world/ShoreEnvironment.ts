@@ -1,21 +1,24 @@
 import {
   Color3, HemisphericLight, Mesh, MeshBuilder,
-  Scene, StandardMaterial, TransformNode, Vector3,
+  Scene, StandardMaterial, Texture, TransformNode, Vector3,
 } from "@babylonjs/core";
 import { TrainingDinghy } from "./TrainingDinghy";
 import { Nameplate } from "../rendering/Nameplate";
+import { WaterSurface } from "../rendering/WaterSurface";
 import { NpcFacing, type NearbyPlayer } from "./NpcFacing";
 import type { WorldConfig, NpcConfig } from "./WorldConfig";
 
-/** Code-built coastal set: no external textures or network dependencies. */
+/** Coastal set with locally hosted surface textures. */
 export class ShoreEnvironment {
   public readonly root: TransformNode;
   public readonly stations = new Map<string, { anchor: TransformNode; meshes: Mesh[] }>();
   private readonly materials: StandardMaterial[] = [];
+  private readonly textures: Texture[] = [];
   private readonly labels: Nameplate[] = [];
   private readonly npcFacing: NpcFacing[] = [];
   private readonly marker: Mesh;
   private readonly flag: Mesh;
+  private readonly water: WaterSurface;
   private time = 0;
   public readonly dinghy: TrainingDinghy;
 
@@ -38,6 +41,20 @@ export class ShoreEnvironment {
       if (!value) throw new Error(`Неизвестный материал мира: ${name}`);
       return value;
     };
+    const surfaceTextures: Array<[string, string, number, number]> = [
+      ["warm-sand", "sand_03.jpg", 12, 8],
+      ["pier-wood", "wooden_planks.jpg", 2, 3],
+      ["ivory-walls", "painted_plaster_wall.jpg", 3, 2],
+    ];
+    for (const [name, file, uScale, vScale] of surfaceTextures) {
+      const texture = new Texture(`/assets/textures/coast/${file}`, scene);
+      texture.uScale = uScale; texture.vScale = vScale;
+      texture.wrapU = Texture.WRAP_ADDRESSMODE; texture.wrapV = Texture.WRAP_ADDRESSMODE;
+      material(name).diffuseTexture = texture;
+      this.textures.push(texture);
+    }
+    material("warm-sand").emissiveColor = Color3.FromHexString("#302419");
+    this.water = new WaterSurface(scene, material("sea"), 30, 25);
     const sea = MeshBuilder.CreateGround("sea", { width: settings.sea.width, height: settings.sea.height }, scene);
     sea.position.set(...settings.sea.position);
     sea.material = material("sea");
@@ -71,6 +88,7 @@ export class ShoreEnvironment {
       if (meshes) meshes.splice(0, meshes.length, ...[...this.dinghy.parts.values()].flat());
     };
     for (const npc of world.npcs) this.createNpc(npc);
+    this.decorateBeach();
     const gold = this.material("quest-gold", "#ffd076");
     gold.emissiveColor = Color3.FromHexString("#be8a25");
     this.marker = MeshBuilder.CreatePolyhedron("quest-beacon", { type: 1, size: 0.35 }, scene);
@@ -91,14 +109,39 @@ export class ShoreEnvironment {
     this.marker.rotation.y = this.time;
     this.marker.position.y = 3.5 + Math.sin(this.time * 2) * 0.18;
     this.dinghy.update(delta);
+    this.water.update(delta);
     this.flag.rotation.y = Math.sin(this.time * 3) * 0.1;
   }
 
   public dispose(): void {
     this.dinghy.dispose();
+    this.water.dispose();
     this.root.dispose();
     this.labels.forEach((label) => label.dispose());
     this.materials.forEach((material) => material.dispose());
+    this.textures.forEach((texture) => texture.dispose());
+  }
+
+  private decorateBeach(): void {
+    const canvas = this.material("beach-parasol-canvas", "#f1dfbf");
+    const trim = this.material("beach-parasol-trim", "#6a9da3");
+    const wood = this.material("beach-furniture-wood", "#98704f");
+    for (const [index, x, z] of [[0, -33, 2], [1, 33, 7]] as const) {
+      const root = new TransformNode(`beach-rest-${index}`, this.scene);
+      root.parent = this.root; root.position.set(x, 0, z);
+      const pole = MeshBuilder.CreateCylinder(`parasol-pole-${index}`, { height: 2.5, diameter: .07, tessellation: 8 }, this.scene);
+      pole.parent = root; pole.position.y = 1.25; pole.material = wood;
+      const shade = MeshBuilder.CreateCylinder(`parasol-top-${index}`, { height: .5, diameterTop: .08, diameterBottom: 3, tessellation: 12 }, this.scene);
+      shade.parent = root; shade.position.y = 2.45; shade.material = index ? trim : canvas;
+      const cap = MeshBuilder.CreateCylinder(`parasol-rim-${index}`, { height: .09, diameter: 3, tessellation: 12 }, this.scene);
+      cap.parent = root; cap.position.y = 2.21; cap.material = index ? canvas : trim;
+      for (const dx of [-.55, .55]) {
+        const leg = MeshBuilder.CreateBox(`bench-leg-${index}`, { width: .1, height: .44, depth: .45 }, this.scene);
+        leg.parent = root; leg.position.set(dx, .22, 1.15); leg.material = wood;
+      }
+      const seat = MeshBuilder.CreateBox(`bench-seat-${index}`, { width: 1.5, height: .1, depth: .5 }, this.scene);
+      seat.parent = root; seat.position.set(0, .48, 1.15); seat.material = wood;
+    }
   }
 
   private createNpc(npc: NpcConfig): void {

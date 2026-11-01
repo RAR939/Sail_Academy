@@ -278,6 +278,9 @@ body {
 .race-wind-arrow { display:inline-block; color:#f1c880; font-size:30px; line-height:1; transform-origin:center; }
 .race-hud { pointer-events: auto; }
 .race-hud button:disabled { opacity: .6; cursor: wait; }
+.race-join-row { display: flex; gap: 8px; margin-top: 12px; }
+.race-join-row input { min-width: 0; flex: 1; padding: 9px; border: 1px solid #809ca4; border-radius: 5px; background: #102934; color: #fff; }
+.race-lobby { white-space: pre-line; font-size: 13px; line-height: 1.5; color: #d7e6e4; }
 
 .admin-entry { position: fixed; z-index: 12; top: 22px; right: 22px; padding: 10px 14px; border: 1px solid #b5cfca77; border-radius: 10px; background: #112b36dd; color: #f6ecd8; cursor: pointer; font: 600 13px system-ui, sans-serif; }
 .admin-entry[hidden] { display: none; }

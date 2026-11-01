@@ -14,14 +14,14 @@ export class Character {
   private readonly fadeDuration = 0.16;
   private readonly visualRoot: TransformNode;
   private readonly fadeObserver: Observer<Scene>;
-  private readonly label: Nameplate;
-  constructor(private scene: Scene, private loader: AssetLoader, private parent: TransformNode, name: string, subtitle?: string) {
+  private readonly label: Nameplate | null;
+  constructor(private scene: Scene, private loader: AssetLoader, private parent: TransformNode, name: string | null, subtitle?: string) {
     this.visualRoot = new TransformNode(`character-facing-${parent.name}`, scene);
     this.visualRoot.parent = parent;
     this.visualRoot.position.y = -0.9;
     this.visualRoot.rotation.y = Math.PI;
     this.fadeObserver = scene.onBeforeRenderObservable.add(() => this.updateFade());
-    this.label = new Nameplate(scene, name, new Vector3(0, 1.43, 0), subtitle ? 3.0 : 2.2, subtitle ? 0.7 : 0.55, parent, true, subtitle);
+    this.label = name ? new Nameplate(scene, name, new Vector3(0, 1.43, 0), subtitle ? 3.0 : 2.2, subtitle ? 0.7 : 0.55, parent, true, subtitle) : null;
   }
   async load(skin: string): Promise<void> {
     const asset = await this.loader.spawn("/assets/glb/characters/protagonist.glb", { name: `character-${this.parent.name}`, parent: this.visualRoot, scaling: new Vector3(0.48, 0.48, 0.48) });
@@ -70,5 +70,5 @@ export class Character {
     this.fading.setWeightForAllAnimatables(1 - weight);
     if (weight >= 1) { this.fading.stop(); this.fading = null; }
   }
-  dispose(): void { if (this.disposed) return; this.disposed = true; this.scene.onBeforeRenderObservable.remove(this.fadeObserver); this.asset?.dispose(); this.visualRoot.dispose(); this.material?.dispose(); this.texture?.dispose(); this.label.dispose(); }
+  dispose(): void { if (this.disposed) return; this.disposed = true; this.scene.onBeforeRenderObservable.remove(this.fadeObserver); this.asset?.dispose(); this.visualRoot.dispose(); this.material?.dispose(); this.texture?.dispose(); this.label?.dispose(); }
 }

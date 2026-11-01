@@ -12,10 +12,10 @@ export class Nameplate {
     ctx.clearRect(0, 0, 1024, 256);
     ctx.beginPath();
     ctx.roundRect(12, 12, 1000, 232, 48);
-    ctx.fillStyle = "rgba(13, 38, 48, 0.78)";
+    ctx.fillStyle = "rgba(13, 38, 48, 0.42)";
     ctx.fill();
     ctx.lineWidth = 3;
-    ctx.strokeStyle = "rgba(197, 225, 218, 0.38)";
+    ctx.strokeStyle = "rgba(197, 225, 218, 0.20)";
     ctx.stroke();
     ctx.fillStyle = "#e7b978";
     ctx.beginPath(); ctx.roundRect(40, 57, 7, 142, 4); ctx.fill();
@@ -43,7 +43,7 @@ export class Nameplate {
     this.material.disableLighting = true;
     this.material.backFaceCulling = false;
     this.material.specularColor = Color3.Black();
-    this.mesh = MeshBuilder.CreatePlane(`label-plane-${text}`, { width, height }, scene);
+    this.mesh = MeshBuilder.CreatePlane(`label-plane-${text}`, { width: width * 0.72, height: height * 0.72 }, scene);
     this.mesh.position.copyFrom(position);
     this.mesh.parent = parent;
     this.mesh.isPickable = false;

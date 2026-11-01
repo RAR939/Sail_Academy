@@ -226,6 +226,8 @@ export class NetworkClient {
     this.send({ t: "create_race" });
   }
 
+  public startRace(): void { this.send({ t: "start_race" }); }
+
   public ping(): void {
     this.send({ t: "ping" });
   }

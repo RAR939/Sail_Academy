@@ -32,7 +32,7 @@
       ]
     },
     "materials": {
-      "warm-sand": "#d8c293",
+      "warm-sand": "#fff2d9",
       "dune-grass": "#83916c",
       "pier-wood": "#96714e",
       "ivory-walls": "#efe7d6",
@@ -1218,6 +1218,42 @@
       19.0,
       2.0,
       0.8
+    ],
+    [
+      "props/crate",
+      20.0,
+      2.0,
+      0.7
+    ],
+    [
+      "environment/bush_large",
+      -30.0,
+      33.0,
+      1.4
+    ],
+    [
+      "environment/bush_large",
+      32.0,
+      30.0,
+      1.2
+    ],
+    [
+      "environment/rock_small_a",
+      -34.0,
+      4.0,
+      1.5
+    ],
+    [
+      "environment/tree_palm_bend",
+      -35.0,
+      36.0,
+      4.3
+    ],
+    [
+      "environment/tree_palm_tall",
+      36.0,
+      35.0,
+      4.5
     ]
   ],
   "special": {

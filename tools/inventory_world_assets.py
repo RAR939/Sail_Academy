@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / "client" / "public" / "assets" / "glb"
+SURFACES = ROOT / "client" / "public" / "assets" / "textures" / "coast"
 OUTPUT = ROOT / "shared" / "world" / "asset-inventory.json"
 
 
@@ -42,11 +43,15 @@ def inspect_glb(data: bytes) -> dict:
 
 def inventory() -> dict:
     resources = []
-    for path in sorted(ASSETS.rglob("*")):
+    for path in sorted([*ASSETS.rglob("*"), *SURFACES.rglob("*")]):
         if not path.is_file() or path.suffix.lower() not in {".glb", ".png", ".jpg", ".jpeg", ".webp", ".ktx2"}:
             continue
         data = path.read_bytes()
-        item = {"url": "/assets/glb/" + path.relative_to(ASSETS).as_posix(), "file_bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+        if path.is_relative_to(ASSETS):
+            url = "/assets/glb/" + path.relative_to(ASSETS).as_posix()
+        else:
+            url = "/assets/textures/coast/" + path.relative_to(SURFACES).as_posix()
+        item = {"url": url, "file_bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
         if path.suffix.lower() == ".glb":
             item.update(inspect_glb(data))
             for uri in item["external_uris"]:
@@ -58,7 +63,7 @@ def inventory() -> dict:
         "version": 1,
         "kind": "asset_inventory_not_runtime_budget",
         "file_bytes_total": sum(item["file_bytes"] for item in resources),
-        "limitations": ["Includes all GLB-directory resources, including assets not instantiated in the hub.", "Excludes procedural meshes and dynamic textures.", "Accessor byte counts exclude alignment, GPU allocation, texture decoding and runtime copies.", "Not a chunk manifest or proof of the 10-percent requirement."],
+        "limitations": ["Includes GLB-directory resources and coastal textures, including assets not instantiated in the hub.", "Excludes procedural meshes and dynamic textures.", "Accessor byte counts exclude alignment, GPU allocation, texture decoding and runtime copies.", "Not a chunk manifest or proof of the 10-percent requirement."],
         "resources": resources,
     }
 

@@ -152,3 +152,20 @@ def test_ollama_connector_and_context(game, monkeypatch):
 
 
 ORIGINAL_GENERATE = service.generate_local
+
+
+def test_vest_can_be_removed_and_put_back_without_resetting_story(game):
+    client, player = game
+    talk(client, player, "captain")
+    talk(client, player, "weather")
+    player.x, player.z = 15, 5
+    worn = client.post("/api/story/interact", json={"target": "vest"}).json()["story"]
+    assert worn["has_vest"] and worn["step"] == "rules"
+    removed = client.post("/api/story/interact", json={"target": "vest"}).json()["story"]
+    assert not removed["has_vest"] and removed["step"] == "rules"
+    assert not client.get("/api/story").json()["has_vest"]
+    assert not talk(client, player, "judge")["story"]["has_vest"]
+    player.x, player.z = 15, 5
+    worn_again = client.post("/api/story/interact", json={"target": "vest"}).json()["story"]
+    assert worn_again["has_vest"] and worn_again["step"] == "pier"
+    assert client.get("/api/story").json()["has_vest"]

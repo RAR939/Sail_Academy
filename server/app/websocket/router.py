@@ -366,6 +366,15 @@ async def game_websocket(websocket: WebSocket):
             # CREATE RACE
             # ---------------------------------
 
+            elif message_type == "start_race":
+                room = room_manager.get_player_room(user_id)
+                try:
+                    if room is None:
+                        raise ValueError("Комната не найдена")
+                    room.start_countdown(user_id, time.monotonic())
+                except ValueError as error:
+                    await websocket.send_json({"t": "error", "message": str(error)})
+
             elif message_type == "create_race":
                 current_room = room_manager.get_player_room(user_id)
 

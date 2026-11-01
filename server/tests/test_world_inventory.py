@@ -19,6 +19,8 @@ class WorldAssetInventoryTest(unittest.TestCase):
         self.assertGreater(boat["file_bytes"], 0)
         crate = next(item for item in actual["resources"] if item["url"].endswith("/props/crate.glb"))
         self.assertIn("Textures/colormap.png", crate["external_uris"])
+        urls = {item["url"] for item in actual["resources"]}
+        self.assertTrue({f"/assets/textures/coast/{name}.jpg" for name in ("sand_03", "wooden_planks", "painted_plaster_wall")} <= urls)
 
     def test_rejects_bad_glb(self):
         with self.assertRaises(ValueError):

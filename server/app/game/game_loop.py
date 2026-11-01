@@ -63,19 +63,28 @@ class GameLoop:
             if room.is_empty():
                 continue
 
-            # Обновляем физику всех лодок комнаты.
+            now = time.monotonic()
+            # Во время отсчёта лодки свободно маневрируют.
             for user_id, boat in room.boats.items():
-                if room.room_type != "race":
+                if room.room_type != "race" or room.race_start_at is None:
                     continue
-                before = (boat.x, boat.z)
-                BoatPhysics.update(
-                    boat,
-                    self.wind,
-                    delta_time
-                )
                 race = room.races.get(user_id)
-                if race:
-                    race.update(before, (boat.x, boat.z))
+                if not race:
+                    continue
+                step = min(max(delta_time, 0.0), 0.1)
+                if now < room.race_start_at:
+                    BoatPhysics.update(boat, self.wind, step)
+                    continue
+                if not race.start_checked:
+                    before_signal = max(0.0, min(step, room.race_start_at - (now - step)))
+                    if before_signal:
+                        BoatPhysics.update(boat, self.wind, before_signal)
+                    race.apply_start_signal((boat.x, boat.z), boat.heading)
+                    step -= before_signal
+                before = (boat.x, boat.z)
+                if step:
+                    BoatPhysics.update(boat, self.wind, step)
+                race.update(before, (boat.x, boat.z), now, boat.heading)
 
             # Формируем обновление состояния игроков.
             players_delta = []
@@ -100,6 +109,7 @@ class GameLoop:
             )
 
             if room.room_type == "race":
+                await manager.send_room(room, room.lobby_snapshot(now))
                 for user_id, race in room.races.items():
                     await manager.send_personal(user_id, {"t": "race_state", **race.snapshot()})
 

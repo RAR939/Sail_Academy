@@ -46,7 +46,15 @@ def index_of(row: Progress) -> int:
     return next((i for i, step in enumerate(STEPS) if step[0] == row.status), 0)
 
 
-def snapshot(row: Progress) -> dict:
+async def vest_state(session: AsyncSession, row: Progress) -> tuple[bool, Progress | None]:
+    result = await session.execute(select(Progress).execution_options(populate_existing=True).where(
+        Progress.user_id == row.user_id, Progress.course_id == "equipment", Progress.lesson_id == "lifejacket"
+    ))
+    equipment = result.scalar_one_or_none()
+    return (equipment.status == "worn" if equipment else index_of(row) >= 3), equipment
+
+
+def snapshot(row: Progress, has_vest: bool | None = None) -> dict:
     index = index_of(row)
     step_id, title, description, target, (x, z) = STEPS[index]
     world = world_config.read()[0]
@@ -59,7 +67,7 @@ def snapshot(row: Progress) -> dict:
         "step": step_id, "index": index, "total": len(STEPS) - 1,
         "title": title, "description": description,
         "target": target, "position": {"x": x, "z": z},
-        "has_vest": index >= 3, "completed": step_id == "completed",
+        "has_vest": index >= 3 if has_vest is None else has_vest, "completed": step_id == "completed",
     }
 
 
@@ -76,7 +84,8 @@ def require_near(user_id: int, position: tuple[float, float]):
 async def get_story(user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
     async with story_lock:
         row = await progress_row(session, user.id)
-        result = snapshot(row)
+        worn, _ = await vest_state(session, row)
+        result = snapshot(row, worn)
         await session.commit()
         return result
 
@@ -91,13 +100,24 @@ async def interact(data: InteractionRequest, user: User = Depends(get_current_us
         row = await progress_row(session, user.id)
         index = index_of(row)
         advanced = STEPS[index][3] == data.target
+        worn, equipment = await vest_state(session, row)
         if advanced:
             row.status = STEPS[index + 1][0]
-        state = snapshot(row)
+            if data.target == "vest":
+                worn = True
+        elif data.target == "vest" and index >= 3:
+            worn = not worn
+            if equipment is None:
+                equipment = Progress(user_id=user.id, course_id="equipment", lesson_id="lifejacket")
+                session.add(equipment)
+            equipment.status = "worn" if worn else "removed"
+        state = snapshot(row, worn)
         await session.commit()
     if advanced:
         message = ("Жилет подобран по размеру и застёгнут. Теперь найдите судью Анну." if data.target == "vest"
                    else "Вы осмотрели нос, корму, парус и румпель учебной лодки. На воду сегодня не выходим. Вернитесь к капитану.")
+    elif data.target == "vest" and index >= 3:
+        message = "Жилет надет и застёгнут." if worn else "Жилет снят и оставлен на стойке."
     else:
         message = "Сначала выполните текущее задание: " + state["description"]
     return {"story": state, "text": message}
@@ -142,7 +162,8 @@ async def dialog(data: DialogRequest, user: User = Depends(get_current_user), se
             row = await progress_row(session, user.id)
             if lesson and index_of(row) == index:
                 row.status = STEPS[index + 1][0]
-            state = snapshot(row)
+            worn, _ = await vest_state(session, row)
+            state = snapshot(row, worn)
             if memory is None:
                 memory = NPCMemory(user_id=user.id, npc_id=data.npc_id)
                 session.add(memory)
