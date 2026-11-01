@@ -8,7 +8,7 @@ export class BoatLesson {
   private highlighter: HighlightLayer;
   private onClose: (() => void) | null = null;
   public get isOpen(): boolean { return !this.root.hidden; }
-  constructor(scene: Scene, private boat: TrainingDinghy, private readonly startRace: () => void) {
+  constructor(scene: Scene, private boat: TrainingDinghy, private readonly startRace: () => void, private readonly joinRace: (roomId: string) => void) {
     this.highlighter = new HighlightLayer("boat-lesson-highlight", scene);
     this.root.className="npc-chat boat-lesson";
     this.root.hidden=true;
@@ -27,9 +27,20 @@ export class BoatLesson {
     this.text.className="boat-part-explanation"; this.text.setAttribute("aria-live","polite");
     const raceButton = document.createElement("button");
     raceButton.type = "button"; raceButton.className = "dialogue-button-primary";
-    raceButton.textContent = "Выйти на тренировочную трассу";
+    raceButton.textContent = "Создать комнату гонки";
     raceButton.addEventListener("click", () => { this.close(); this.startRace(); });
-    this.root.append(header,intro,this.buttons,this.text,raceButton);
+    const joinRow = document.createElement("div"); joinRow.className = "race-join-row";
+    const roomInput = document.createElement("input"); roomInput.placeholder = "Код комнаты, например race_12345678";
+    roomInput.maxLength = 32; roomInput.setAttribute("aria-label", "Код комнаты гонки");
+    const joinButton = document.createElement("button"); joinButton.type = "button"; joinButton.textContent = "Войти в комнату";
+    joinButton.addEventListener("click", () => {
+      const code = roomInput.value.trim();
+      if (!/^race_[a-f0-9]{8}$/.test(code)) { roomInput.setCustomValidity("Введите код вида race_12345678"); roomInput.reportValidity(); return; }
+      roomInput.setCustomValidity(""); this.close(); this.joinRace(code);
+    });
+    roomInput.addEventListener("input", () => roomInput.setCustomValidity(""));
+    joinRow.append(roomInput, joinButton);
+    this.root.append(header,intro,this.buttons,this.text,raceButton,joinRow);
     this.root.addEventListener("keydown",(event)=>{event.stopPropagation(); if(event.key==="Escape") this.close();});
     this.root.addEventListener("keyup",(event)=>event.stopPropagation());
     document.body.append(this.root);

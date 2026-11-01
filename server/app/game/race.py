@@ -13,6 +13,35 @@ START_CENTER = (-22.5, 0.0)
 FINISH_CENTER = (12.5, 0.0)
 
 
+def hull_front_z(z: float, heading: float) -> float:
+    """Approximate furthest point of the 4.2 m dinghy along the start-line normal."""
+    return z + 2.15 * abs(math.cos(heading)) + 0.68 * abs(math.sin(heading))
+
+
+def hull_in_start_triangle(position: tuple[float, float], heading: float) -> bool:
+    """Intersect the approximate hull with the start-line/first-mark triangle."""
+    x, z = position
+    forward = (math.sin(heading), math.cos(heading))
+    side = (math.cos(heading), -math.sin(heading))
+    hull = [
+        (x + forward[0] * length + side[0] * width,
+         z + forward[1] * length + side[1] * width)
+        for length, width in ((-2.15, -.68), (2.15, -.68), (2.15, .68), (-2.15, .68))
+    ]
+    triangle = (*START_LINE, MARKS[0])
+    # Separating-axis test also catches hull edges crossing the triangle when
+    # no hull vertex is inside it. Boundaries count as being in the zone.
+    for polygon in (hull, triangle):
+        for i, point in enumerate(polygon):
+            other = polygon[(i + 1) % len(polygon)]
+            axis = (-(other[1] - point[1]), other[0] - point[0])
+            hull_projection = [p[0] * axis[0] + p[1] * axis[1] for p in hull]
+            triangle_projection = [p[0] * axis[0] + p[1] * axis[1] for p in triangle]
+            if max(hull_projection) < min(triangle_projection) or max(triangle_projection) < min(hull_projection):
+                return False
+    return True
+
+
 def crossed_line(before: tuple[float, float], after: tuple[float, float], direction: int, line_z: float = 0.0, x_min: float = -12.0, x_max: float = 12.0) -> bool:
     x0, z0 = before
     x1, z1 = after
@@ -72,11 +101,24 @@ class RaceProgress:
     started_at: float | None = None
     finished_in: float | None = None
     mark_approached: bool = False
+    start_signal_at: float | None = None
+    start_checked: bool = False
+    individual_recall: bool = False
 
-    def update(self, before: tuple[float,float], after: tuple[float,float], now: float | None = None):
+    def apply_start_signal(self, position: tuple[float, float], heading: float) -> None:
+        if self.start_checked:
+            return
+        self.start_checked = True
+        self.individual_recall = hull_in_start_triangle(position, heading)
+
+    def update(self, before: tuple[float,float], after: tuple[float,float], now: float | None = None, heading: float = 0.0):
         now = time.monotonic() if now is None else now
+        if self.phase == "start" and self.individual_recall:
+            if hull_front_z(after[1], heading) < 0:
+                self.individual_recall = False
+            return
         if self.phase == "start" and crossed_line(before, after, 1, 0.0, START_LINE[0][0], START_LINE[1][0]):
-            self.phase = "marks"; self.started_at = now
+            self.phase = "marks"; self.started_at = self.start_signal_at if self.start_signal_at is not None else now
         elif self.phase == "marks":
             mark = MARKS[self.next_mark]
             gate, sign = rounding_gate(self.next_mark)
@@ -95,6 +137,7 @@ class RaceProgress:
 
     def snapshot(self, now: float | None = None) -> dict:
         now = time.monotonic() if now is None else now
-        elapsed = self.finished_in if self.finished_in is not None else (max(0.0, now-self.started_at) if self.started_at is not None else 0.0)
+        clock_start = self.started_at if self.started_at is not None else self.start_signal_at
+        elapsed = self.finished_in if self.finished_in is not None else (max(0.0, now-clock_start) if clock_start is not None else 0.0)
         gate = rounding_gate(self.next_mark)[0] if self.phase == "marks" else None
-        return {"phase":self.phase, "nextMark":self.next_mark, "elapsed":round(elapsed,2), "marks":[list(m) for m in MARKS], "markRadius":MARK_RADIUS, "startLine":[list(p) for p in START_LINE], "finishLine":[list(p) for p in FINISH_LINE], "markSide":"port", "roundingGate":list(gate) if gate else None, "markApproached":self.mark_approached}
+        return {"phase":self.phase, "nextMark":self.next_mark, "elapsed":round(elapsed,2), "marks":[list(m) for m in MARKS], "markRadius":MARK_RADIUS, "startLine":[list(p) for p in START_LINE], "finishLine":[list(p) for p in FINISH_LINE], "markSide":"port", "roundingGate":list(gate) if gate else None, "markApproached":self.mark_approached, "individualRecall":self.individual_recall}

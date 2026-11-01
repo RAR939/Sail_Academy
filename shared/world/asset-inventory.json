@@ -1,9 +1,9 @@
 {
   "version": 1,
   "kind": "asset_inventory_not_runtime_budget",
-  "file_bytes_total": 2615138,
+  "file_bytes_total": 4494583,
   "limitations": [
-    "Includes all GLB-directory resources, including assets not instantiated in the hub.",
+    "Includes GLB-directory resources and coastal textures, including assets not instantiated in the hub.",
     "Excludes procedural meshes and dynamic textures.",
     "Accessor byte counts exclude alignment, GPU allocation, texture decoding and runtime copies.",
     "Not a chunk manifest or proof of the 10-percent requirement."
@@ -113,6 +113,21 @@
       "url": "/assets/glb/props/Textures/colormap.png",
       "file_bytes": 8706,
       "sha256": "0d4947d34ff32acf4a359c7f22ca784e057e7e72f622170a9a77b6fc88fdb70e"
+    },
+    {
+      "url": "/assets/textures/coast/painted_plaster_wall.jpg",
+      "file_bytes": 686726,
+      "sha256": "440310f05af089f2c93353167573403cbc3f805948203237b5d26431eeb9e19c"
+    },
+    {
+      "url": "/assets/textures/coast/sand_03.jpg",
+      "file_bytes": 703132,
+      "sha256": "e72144f9d7b81bdb7bbdb34222b53431738dcef79346dd89412d2abd541e4d30"
+    },
+    {
+      "url": "/assets/textures/coast/wooden_planks.jpg",
+      "file_bytes": 489587,
+      "sha256": "1273876d6f92fb1a1d29c1bb28f548a9256154187531e84f993b56e347f1d17b"
     }
   ]
 }

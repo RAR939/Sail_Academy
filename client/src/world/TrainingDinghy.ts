@@ -2,7 +2,7 @@
 
 import { LoadAssetContainerAsync } from "@babylonjs/core";
 import "@babylonjs/loaders/glTF";
-import { sailSideForWind } from "../gameplay/WindVisual";
+import { sailMirrorForSide, sailSideForWind } from "../gameplay/WindVisual";
 
 export const BOAT_PARTS = [
   { id: "hull", title: "Корпус и кокпит", text: "Корпус удерживает лодку на плаву. Нос находится впереди, корма — сзади. В кокпите сидит рулевой; борта помогают удерживать воду снаружи." },
@@ -23,6 +23,7 @@ export class TrainingDinghy {
   private readonly rudderRig: TransformNode;
   private readonly board: Mesh;
   private sailSide = 1;
+  private readonly importedSailMeshes: Mesh[] = [];
   private targetSail = 0.22;
   private targetRudder = 0;
   private boardRaised = false;
@@ -92,7 +93,8 @@ export class TrainingDinghy {
   /** Heading and windDirection are world angles; windDirection is where wind comes from. */
   public setSailingState(sheetAngle: number, windDirection: number, heading: number): void {
     // A little hysteresis prevents the boom switching sides on every snapshot.
-    this.sailSide = sailSideForWind(windDirection, heading, this.sailSide);
+    const side = sailSideForWind(windDirection, heading, this.sailSide);
+    if (side !== this.sailSide) { this.sailSide = side; this.updateSailMirror(); }
     this.targetSail = Math.max(0, Math.min(Math.PI / 2, sheetAngle)) * this.sailSide;
   }
   public dispose(): void { this.disposed = true; this.root.dispose(); this.mats.forEach((m) => m.dispose()); }
@@ -117,6 +119,7 @@ export class TrainingDinghy {
         mesh.material = id === "sail" ? canvas : id === "mast" || id === "boom" ? aluminium : id === "rudder" || id === "centreboard" ? black : white;
         if (id === "sail" || id === "boom" || id === "mast") {
           mesh.parent = this.sailRig; mesh.position.set(-0.05, 0, 0.82);
+          if (id === "sail" || id === "boom") this.importedSailMeshes.push(mesh);
         } else if (id === "rudder") {
           mesh.parent = this.rudderRig; mesh.position.set(0, -0.3, -2.26);
         } else if (id === "centreboard") {
@@ -126,9 +129,17 @@ export class TrainingDinghy {
         }
         this.add(id, mesh);
       }
+      this.updateSailMirror();
       this.onModelLoaded?.();
     } catch (error) {
       console.warn("Не удалось загрузить модель Laser; используется учебная модель", error);
+    }
+  }
+  private updateSailMirror(): void {
+    const mirror = sailMirrorForSide(this.sailSide, 0.05);
+    for (const mesh of this.importedSailMeshes) {
+      mesh.scaling.x = mirror.scaleX;
+      mesh.position.x = mirror.offsetX;
     }
   }
   private add(id: BoatPart, mesh: Mesh): void { const group=this.parts.get(id) ?? []; group.push(mesh); this.parts.set(id,group); }

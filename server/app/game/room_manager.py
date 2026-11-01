@@ -77,7 +77,7 @@ class RoomManager:
             return True
 
         if room.room_type == "race":
-            return room.get_player_count() < MAX_RACE_PLAYERS
+            return room.race_start_at is None and room.get_player_count() < MAX_RACE_PLAYERS
 
         return True
 
@@ -122,7 +122,7 @@ class RoomManager:
             return
 
         if not self.can_join(target_room, user_id):
-            raise ValueError("Room is full")
+            raise ValueError("Комната заполнена или отсчёт уже начался")
 
         old_room = self.get_room(old_room_id)
 

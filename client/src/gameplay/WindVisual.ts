@@ -11,3 +11,9 @@ export function sailSideForWind(direction: number, heading: number, previous: nu
   const side = Math.sin(direction - heading);
   return Math.abs(side) > 0.08 ? Math.sign(side) : previous;
 }
+
+/** Mirror the imported sail around its mast, preserving its original right-tack shape. */
+export function sailMirrorForSide(side: number, mastOffset: number): { scaleX: number; offsetX: number } {
+  const scaleX = side < 0 ? -1 : 1;
+  return { scaleX, offsetX: -mastOffset * scaleX };
+}

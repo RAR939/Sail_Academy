@@ -68,6 +68,7 @@ export type ClientMessage =
   | MoveMessage
   | BoatInputMessage
   | CreateRaceMessage
+  | { t: "start_race" }
   | EnterLocationMessage;
 
 export interface WelcomeMessage {
@@ -125,6 +126,16 @@ export interface RaceStateMessage {
   markSide: "port";
   roundingGate: [number, number] | null;
   markApproached: boolean;
+  individualRecall: boolean;
+}
+
+export interface RaceLobbyMessage {
+  t: "race_lobby";
+  roomId: string;
+  hostId: number | null;
+  phase: "waiting" | "countdown" | "racing";
+  secondsLeft: number | null;
+  players: Array<{ id: number; name: string; phase: string; elapsed: number | null; individualRecall: boolean }>;
 }
 
 export type ServerMessage =
@@ -135,6 +146,7 @@ export type ServerMessage =
   | ErrorMessage
   | LocationChangedMessage
   | RaceCreatedMessage
+  | RaceLobbyMessage
   | RaceStateMessage;
 
 export type ServerMessageType = ServerMessage["t"];
