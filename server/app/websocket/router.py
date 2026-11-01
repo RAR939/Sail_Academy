@@ -51,7 +51,7 @@ def validate_player_movement(
     z: float,
     now: float
 ) -> bool:
-    elapsed = min(now - player.last_update, 0.5)
+    elapsed = min(now - player.last_update, 2.0)
 
     if elapsed <= 0:
         return False
@@ -356,10 +356,7 @@ async def game_websocket(websocket: WebSocket):
                     float(z),
                     time.monotonic()
                 ):
-                    await websocket.send_json({
-                        "t": "error",
-                        "message": "Movement speed limit exceeded"
-                    })
+                    await websocket.send_json({"t": "movement_correction", "x": player.x, "y": player.y, "z": player.z})
                     continue
 
                 player.update_position(

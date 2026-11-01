@@ -59,6 +59,22 @@ export class ShoreEnvironment {
     sea.position.set(...settings.sea.position);
     sea.material = material("sea");
     sea.parent = this.root;
+    // A soft strip of wet sand and broken foam gives the beach a shoreline.
+    const wetSand = this.material("shore-wet-sand", "#c6b797");
+    const foam = this.material("shore-soft-foam", "#e9f7ee");
+    foam.alpha = 0.65;
+    const shoreline = MeshBuilder.CreateGround("shoreline-wet-sand", {width: 90, height: 1.4}, scene);
+    shoreline.parent = this.root; shoreline.position.set(0, 0.025, -12.2); shoreline.material = wetSand; shoreline.isPickable = false;
+    for (let index = 0; index < 28; index++) {
+      const x = -43 + index * 3.15;
+      // Leave the entrance to the pier unobstructed.
+      if (x > -17 && x < -11) continue;
+      const ripple = MeshBuilder.CreateDisc(`shore-foam-${index}`, {radius: 1, tessellation: 16}, scene);
+      ripple.parent = this.root; ripple.rotation.x = Math.PI / 2;
+      ripple.scaling.set(1.15 + (index % 3) * 0.25, 0.18 + (index % 2) * 0.06, 1);
+      ripple.position.set(x, 0.04, -12.8 + Math.sin(index * 1.7) * 0.3);
+      ripple.material = foam; ripple.isPickable = false;
+    }
     const vestMeshes: Mesh[] = [];
     let flag: Mesh | null = null;
     const boatConfig = world.boxes.find((item) => item.name === "training-dinghy");

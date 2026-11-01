@@ -7,7 +7,7 @@ interface TimedPlayerSnapshot {
 
 export class InterpolationBuffer {
   private readonly snapshots: TimedPlayerSnapshot[] = [];
-  private readonly interpolationDelayMs = 100;
+  private readonly interpolationDelayMs = 180;
   private readonly maxSnapshots = 20;
 
   public push(state: PlayerStateMessage, receivedAt: number): void {

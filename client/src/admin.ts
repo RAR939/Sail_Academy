@@ -1,7 +1,8 @@
-import { ArcRotateCamera, Engine, Scene, Vector3 } from "@babylonjs/core";
+import { ArcRotateCamera, Engine, Scene, Vector3, HemisphericLight, MeshBuilder, StandardMaterial, Color3 } from "@babylonjs/core";
 import { ShoreEnvironment } from "./world/ShoreEnvironment";
 import { AssetLoader } from "./rendering/AssetLoader";
 import { Character } from "./rendering/Character";
+import { WaterSurface } from "./rendering/WaterSurface";
 import { TransformNode } from "@babylonjs/core";
 import type { WorldConfig, WorldResponse } from "./world/WorldConfig";
 import "./styles/admin.css";
@@ -19,7 +20,7 @@ root.innerHTML = `
     <p id="status" class="status" role="status"></p>
     <section class="backups"><h3>Игроки и права</h3><p>FPS и задержка измеряются на клиенте; данные обновляются каждые несколько секунд.</p><div id="admin-players"></div><p id="players-status" role="status"></p></section>
     <section class="backups"><h3>Резервные копии</h3><p>Создаются автоматически перед сохранением и откатом.</p><select id="backups" aria-label="Резервная копия"></select><div class="actions"><button id="load-backup" class="secondary">Открыть в черновике</button><button id="restore" class="secondary">Откатить мир</button></div></section>
-  </section><section class="preview"><div class="preview-bar"><div><span class="eyebrow">ПРЕДПРОСМОТР</span><h2>Береговой клуб</h2></div><span>Клик по объекту — выбрать · перетаскивание — вращение · колесо — масштаб</span></div><canvas id="preview-canvas"></canvas></section></div>
+  </section><section class="preview"><div class="preview-bar"><div><span class="eyebrow">ПРЕДПРОСМОТР</span><h2>Локация</h2><select id="location"><option value="shore">Береговой клуб</option><option value="race">Гоночная акватория</option></select><div id="race-rooms"></div></div><span>Клик по объекту — выбрать · перетаскивание — вращение · колесо — масштаб</span></div><canvas id="preview-canvas"></canvas></section></div>
 </main>`;
 const $ = <T extends Element>(selector: string): T => root.querySelector<T>(selector)!;
 const login = $<HTMLElement>("#login"), editor = $<HTMLElement>("#editor"), status = $<HTMLElement>("#status");
@@ -217,6 +218,30 @@ function renderPreview(world: WorldConfig): void {
   scene.collisionsEnabled = true;
   const nextCamera = new ArcRotateCamera("admin-camera", previousCamera?.alpha ?? -1.3, previousCamera?.beta ?? 0.9, previousCamera?.radius ?? 55, previousCamera?.target ?? new Vector3(0, 0, 8), scene);
   camera = nextCamera; nextCamera.lowerRadiusLimit = 3; nextCamera.upperRadiusLimit = 150; nextCamera.wheelPrecision = 3; nextCamera.attachControl(canvas, true); scene.activeCamera = nextCamera;
+  previewEnvironment = null; previewLoader = null;
+  if ($<HTMLSelectElement>("#location").value === "race") {
+    nextCamera.setTarget(new Vector3(-25,0,0)); nextCamera.radius = 180; nextCamera.upperRadiusLimit = 400;
+    new HemisphericLight("race-preview-light",new Vector3(0,1,0),scene);
+    const sea = MeshBuilder.CreateGround("race-preview-sea",{width:400,height:400},scene);
+    const water = new StandardMaterial("race-preview-water",scene); water.diffuseColor = Color3.FromHexString("#499ca9"); sea.material=water;
+    const surface = new WaterSurface(scene, water, 26, 26);
+    scene.onBeforeRenderObservable.add(() => surface.update(scene.getEngine().getDeltaTime() / 1000));
+    scene.onDisposeObservable.add(() => surface.dispose());
+    void api<{marks:number[][]; startLine:number[][]; finishLine:number[][]; rooms:Array<{roomId:string;phase:string;players:unknown[]}>}>("/api/admin/races").then(data => {
+      if (scene.isDisposed) return;
+      data.marks.forEach((point,index) => {
+        const buoy=MeshBuilder.CreateCylinder(`Знак ${index+1}`,{height:3,diameter:2},scene); buoy.position.set(point[0]!,1.5,point[1]!);
+        const mat=new StandardMaterial(`buoy-${index}`,scene);mat.diffuseColor=Color3.FromHexString("#fca34c");buoy.material=mat;
+      });
+      for (const [name,line] of [["Старт",data.startLine],["Финиш",data.finishLine]] as const) MeshBuilder.CreateLines(name,{points:line.map(p=>new Vector3(p[0]!,.1,p[1]!))},scene);
+      const committee=MeshBuilder.CreateBox("Судейское судно",{width:2,height:2,depth:5},scene);committee.position.set(0,1,0);
+      const container=$<HTMLElement>("#race-rooms");container.replaceChildren();
+      for(const room of data.rooms){const row=document.createElement("div");row.textContent=`${room.roomId} · ${room.phase} · ${room.players.length} игроков `;const button=document.createElement("button");button.textContent="Дать предстартовый сигнал";button.disabled=room.phase!=="waiting";button.onclick=()=>{void api(`/api/admin/races/${room.roomId}/start`,{method:"POST"}).then(()=>renderPreview(parseDraft())).catch(error=>showStatus(String(error),true));};row.append(button);container.append(row);}
+      if(!data.rooms.length)container.textContent="Активных гоночных комнат нет";
+    }).catch(error=>showStatus(String(error),true));
+    return;
+  }
+  $<HTMLElement>("#race-rooms").replaceChildren();
   previewEnvironment = new ShoreEnvironment(scene, world, true);
   const loader = new AssetLoader(scene); previewLoader = loader;
   const version = ++previewVersion;
@@ -287,3 +312,5 @@ $<HTMLButtonElement>("#restore").addEventListener("click", () => { void (async (
 window.addEventListener("resize", () => engine?.resize());
 window.addEventListener("beforeunload", event => { if (saved && json.value !== JSON.stringify(saved, null, 2)) event.preventDefault(); });
 if (token) void openEditor().catch(() => { login.hidden = false; editor.hidden = true; });
+
+$<HTMLSelectElement>("#location").addEventListener("change",()=>{ camera=null; try{renderPreview(parseDraft());}catch(error){showStatus(String(error),true);} });

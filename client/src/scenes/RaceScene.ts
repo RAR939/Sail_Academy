@@ -36,7 +36,7 @@ export class RaceScene {
   private signalKey = "";
   private gateLine: Mesh | null = null;
   private gateKey = "";
-  private readonly remote = new Map<number, { anchor: TransformNode; boat: TrainingDinghy }>();
+  private readonly remote = new Map<number, { anchor: TransformNode; boat: TrainingDinghy; target: BoatStateMessage }>();
   private readonly unsubscribers: Array<() => void> = [];
   private readonly keys = new Set<string>();
   private heading = 0.8;
@@ -141,7 +141,13 @@ export class RaceScene {
     this.boat.setSailingState(this.sailAngle, this.windDirection, this.anchor.rotation.y);
     this.boat.update(delta);
     this.water.update(delta);
-    for (const remote of this.remote.values()) remote.boat.update(delta);
+    for (const remote of this.remote.values()) {
+      const blend = 1 - Math.exp(-8 * delta);
+      remote.anchor.position = Vector3.Lerp(remote.anchor.position, Vector3.FromArray(remote.target.pos), blend);
+      remote.anchor.rotation.y = Scalar.LerpAngle(remote.anchor.rotation.y, remote.target.heading, blend);
+      remote.boat.setSailingState(remote.target.sailAngle, this.windDirection, remote.anchor.rotation.y);
+      remote.boat.update(delta);
+    }
     this.worldWindArrow.position.set(
       this.anchor.position.x + Math.sin(this.windDirection) * 6,
       0.15,
@@ -237,10 +243,10 @@ export class RaceScene {
       if(!remote) {
         const anchor = new TransformNode(`remote-boat-${state.id}`, this.scene);
         const boat = new TrainingDinghy(this.scene, anchor); boat.root.position.set(0,0,0); boat.root.rotation.y = Math.PI;
-        remote = { anchor, boat }; this.remote.set(state.id, remote);
+        anchor.position.set(...state.boat.pos); anchor.rotation.y = state.boat.heading;
+        remote = { anchor, boat, target: state.boat }; this.remote.set(state.id, remote);
       }
-      remote.anchor.position.set(...state.boat.pos); remote.anchor.rotation.y=state.boat.heading;
-      remote.boat.setSailingState(state.boat.sailAngle, this.windDirection, state.boat.heading);
+      remote.target = state.boat;
     }
     for(const [id,remote] of this.remote) if(!present.has(id)) {remote.boat.dispose();remote.anchor.dispose();this.remote.delete(id);}
   }
