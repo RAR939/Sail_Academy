@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.content import NPCS, STEPS, STORY_REPLIES
 from app.admin import world as world_config
-from app.ai.service import answer
+from app.ai.service import AIUnavailable, answer
 from app.database.connection import get_db
 from app.database.models import NPCMemory, Progress, User
 from app.game.room_manager import room_manager
@@ -157,7 +157,10 @@ async def dialog(data: DialogRequest, user: User = Depends(get_current_user), se
             # Release the DB read transaction before waiting for the model.
             await session.commit()
         repeated = any(message.get("role") == "user" and message.get("content", "").casefold() == data.text.strip().casefold() for message in history)
-        text, backend = await answer(data.npc_id, data.text.strip(), history, lesson, repeated)
+        try:
+            text, backend, rag = await answer(data.npc_id, data.text.strip(), history, lesson, repeated)
+        except AIUnavailable:
+            raise HTTPException(503, "Наставник временно недоступен. Попробуйте позже.")
         async with story_lock:
             row = await progress_row(session, user.id)
             if lesson and index_of(row) == index:
@@ -172,6 +175,6 @@ async def dialog(data: DialogRequest, user: User = Depends(get_current_user), se
                 {"role": "assistant", "content": text},
             ], ensure_ascii=False)
             await session.commit()
-        return {"npc_id": data.npc_id, "speaker": npc["name"], "text": text, "backend": backend, "story": state}
+        return {"npc_id": data.npc_id, "speaker": npc["name"], "text": text, "backend": backend, "story": state, "rag": rag}
     finally:
         dialogue_lock.release()
