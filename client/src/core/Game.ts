@@ -9,6 +9,7 @@ import { DEFAULT_WORLD, fetchWorld, type WorldConfig, type WorldResponse } from 
 
 
 import { NetworkClient } from "../network/NetworkClient";
+import { PlayerChat } from "../ui/PlayerChat";
 import {
   NetworkLoginOverlay,
   type NetworkLoginValues,
@@ -18,6 +19,7 @@ export class Game {
   private readonly engine: Engine;
   private readonly scene: Scene;
   private readonly network = new NetworkClient();
+  private readonly playerChat: PlayerChat;
   private hubScene: HubScene;
   private revision = "";
   private world: WorldConfig = DEFAULT_WORLD;
@@ -47,6 +49,7 @@ export class Game {
     this.scene.collisionsEnabled = true;
 
     this.hubScene = new HubScene(this.scene, canvas, this.network, this.world);
+    this.playerChat = new PlayerChat(this.network, canvas);
     this.adminButton.textContent = "⚙ Админ-панель";
     this.adminButton.className = "admin-entry";
     this.adminButton.hidden = true;
@@ -128,6 +131,7 @@ export class Game {
     this.gameSubscriptions.forEach((unsubscribe) => unsubscribe());
     this.raceScene?.dispose();
     this.loginOverlay.dispose();
+    this.playerChat.dispose();
     this.network.disconnect();
     this.hubScene.dispose();
     this.scene.dispose();

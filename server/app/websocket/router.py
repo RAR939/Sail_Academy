@@ -2,6 +2,7 @@ import asyncio
 import logging
 import math
 import time
+from collections import deque
 
 import jwt
 
@@ -26,6 +27,9 @@ router = APIRouter()
 PLAYER_MAX_SPEED = 4.0
 PLAYER_MAX_VERTICAL_SPEED = 3.0
 MOVEMENT_TOLERANCE = 0.5
+CHAT_MAX_LENGTH = 400
+CHAT_RATE_LIMIT = 5
+CHAT_RATE_WINDOW = 8.0
 
 
 def get_message_type(message: dict):
@@ -128,6 +132,7 @@ async def enter_room(
 async def game_websocket(websocket: WebSocket):
     user_id = None
     authenticated = False
+    chat_times: deque[float] = deque()
 
     await websocket.accept()
 
@@ -278,6 +283,31 @@ async def game_websocket(websocket: WebSocket):
                 await websocket.send_json({
                     "t": "pong"
                 })
+
+            elif message_type == "chat":
+                # Only the current authenticated connection may speak for this user.
+                if manager.connections.get(user_id) is not websocket:
+                    break
+                value = message.get("text")
+                if not isinstance(value, str) or len(value) > CHAT_MAX_LENGTH:
+                    await websocket.send_json({"t": "chat_error", "message": "Сообщение должно содержать не более 400 символов."})
+                    continue
+                text = " ".join(value.split())
+                if not text or not text.isprintable():
+                    await websocket.send_json({"t": "chat_error", "message": "Введите текст сообщения."})
+                    continue
+                now = time.monotonic()
+                while chat_times and now - chat_times[0] >= CHAT_RATE_WINDOW:
+                    chat_times.popleft()
+                if len(chat_times) >= CHAT_RATE_LIMIT:
+                    await websocket.send_json({"t": "chat_error", "message": "Слишком много сообщений. Попробуйте через несколько секунд."})
+                    continue
+                room = room_manager.get_player_room(user_id)
+                if room is None:
+                    continue
+                chat_times.append(now)
+                await manager.send_room(room, {"t": "chat", "user_id": user_id, "username": player.username,
+                                               "text": text, "roomId": room.room_id})
 
             elif message_type == "metrics":
                 fps, ping = message.get("fps"), message.get("ping")

@@ -108,7 +108,7 @@ export class RaceScene {
       window.setTimeout(() => { if (!this.disposed) back.disabled = false; }, 5000);
     });
     this.hud.append(title,this.lobbyText,this.startButton,this.status,windIndicator,this.telemetry,controls,back); document.body.append(this.hud);
-    window.addEventListener("keydown",this.onDown); window.addEventListener("keyup",this.onUp); window.addEventListener("blur",this.onBlur);
+    window.addEventListener("keydown",this.onDown); window.addEventListener("keyup",this.onUp, true); window.addEventListener("blur",this.onBlur);
     this.unsubscribers.push(
       network.on("players",(message)=>this.updatePlayers(message.delta)),
       network.on("wind",(message)=>{this.windSpeed=message.speed;this.windDirection=message.direction;}),
@@ -325,7 +325,7 @@ export class RaceScene {
   private readonly onBlur=():void=>{this.keys.clear();};
   public dispose():void {
     if(this.disposed)return;this.disposed=true;
-    window.removeEventListener("keydown",this.onDown);window.removeEventListener("keyup",this.onUp);window.removeEventListener("blur",this.onBlur);
+    window.removeEventListener("keydown",this.onDown);window.removeEventListener("keyup",this.onUp, true);window.removeEventListener("blur",this.onBlur);
     this.unsubscribers.forEach(fn=>fn());this.hud.remove();this.boat.dispose();this.water.dispose();
     for (const remote of this.remote.values()) { remote.boat.dispose(); remote.anchor.dispose(); }
     this.scene.dispose();
