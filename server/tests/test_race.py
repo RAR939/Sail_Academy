@@ -164,7 +164,7 @@ async def test_game_loop_allows_manoeuvring_during_countdown(monkeypatch):
     await loop.update(.05)
     assert not calls
     room.start_countdown(1, 99)
-    assert room.race_start_at == 279
+    assert room.race_start_at == 99 + room.race_countdown
     await loop.update(.05)
     assert len(calls) == 1
     assert not room.races[1].start_checked
