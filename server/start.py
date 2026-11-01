@@ -23,6 +23,42 @@ def get_local_ip():
         sock.close()
 
 
+def find_openssl():
+    candidates = [shutil.which("openssl")]
+    if os.name == "nt":
+        # Git's usr/bin binary may depend on unavailable MSYS DLLs; the UCRT
+        # build is self-contained when invoked from Python on Windows.
+        candidates.extend(["C:/Program Files/Git/ucrt64/bin/openssl.exe", "C:/Program Files/Git/usr/bin/openssl.exe"])
+    for candidate in candidates:
+        if not candidate or not Path(candidate).is_file():
+            continue
+        try:
+            subprocess.run([candidate, "version"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+            return candidate
+        except (OSError, subprocess.SubprocessError):
+            continue
+    raise RuntimeError("Рабочий OpenSSL не найден. Установите OpenSSL или Git for Windows и перезапустите терминал.")
+
+
+def certificate_directory(ip: str, directory: Path) -> Path:
+    """Keep existing keys intact, use a separate folder for another IP or broken files."""
+    def state(path):
+        cert, key, addresses = path / "lan-cert.pem", path / "lan-key.pem", path / "lan-ip.txt"
+        if not any(p.exists() for p in (cert, key, addresses)):
+            return "empty"
+        if cert.is_file() and key.is_file() and addresses.is_file() and addresses.read_text(encoding="ascii").strip() == ip:
+            return "ready"
+        return "occupied"
+
+    if state(directory) != "occupied":
+        return directory
+    for index in range(1000):
+        candidate = directory / (f"ip-{ip}" + (f"-{index}" if index else ""))
+        if state(candidate) != "occupied":
+            return candidate
+    raise RuntimeError("Не удалось подобрать отдельную папку для сертификата. Укажите --cert-dir.")
+
+
 def create_certificate(ip: str, directory: Path, openssl: str | None = None):
     """Generate a local certificate without overwriting existing key material."""
     ipaddress.ip_address(ip)
@@ -32,12 +68,7 @@ def create_certificate(ip: str, directory: Path, openssl: str | None = None):
         if not (cert.is_file() and key.is_file() and addresses.is_file() and addresses.read_text().strip() == ip):
             raise RuntimeError("Сертификат для другого IP или его файлы неполные. Укажите новую папку через --cert-dir.")
         return cert, key
-    executable = openssl or shutil.which("openssl")
-    if not executable:
-        git_openssl = Path("C:/Program Files/Git/usr/bin/openssl.exe")
-        executable = str(git_openssl) if git_openssl.exists() else None
-    if not executable:
-        raise RuntimeError("OpenSSL не найден. Установите OpenSSL или Git for Windows.")
+    executable = openssl or find_openssl()
     previous_umask = os.umask(0o077)
     try:
         subprocess.run([
@@ -86,9 +117,11 @@ def main():
     ssl_options = {}
     if args.https:
         try:
-            cert, key = create_certificate(ip, args.cert_dir)
+            cert_dir = certificate_directory(ip, args.cert_dir)
+            cert, key = create_certificate(ip, cert_dir)
         except (ValueError, RuntimeError, OSError, subprocess.CalledProcessError) as error:
-            parser.error(f"Не удалось подготовить сертификат: {error}")
+            detail = error.stderr.decode(errors="replace").strip() if isinstance(error, subprocess.CalledProcessError) and error.stderr else str(error)
+            parser.error(f"Не удалось подготовить сертификат: {detail}")
         ssl_options = {"ssl_certfile": str(cert), "ssl_keyfile": str(key)}
         print(f"Сертификат для установки на устройства: {cert}")
     scheme = "https" if args.https else "http"
