@@ -266,3 +266,6 @@ body {
 .network-login-status.is-error {
   color: #ff9f9f;
 }
+.boat-lesson .boat-parts { display:flex; flex-wrap:wrap; gap:8px; margin: 12px 0; }
+.boat-lesson .boat-parts button[aria-pressed="true"] { background:#e9bf7d; color:#112b36; }
+.boat-lesson .boat-part-explanation { min-height:64px; padding:14px; border-radius:8px; background:#081e2780; color:#f2eee1; font-size:15px; line-height:1.5; }

@@ -3,6 +3,7 @@ import {
   Scene, StandardMaterial, TransformNode, Vector3,
 } from "@babylonjs/core";
 import type { NpcIdentity } from "../ui/NpcChat";
+import { TrainingDinghy } from "./TrainingDinghy";
 
 export const SHORE_NPCS: Array<NpcIdentity & { x: number; z: number }> = [
   { id: "captain", name: "Капитан Морозов", role: "Главный тренер · основы парусного спорта", color: "#e8b96b", x: 4, z: 3 },
@@ -20,6 +21,7 @@ export class ShoreEnvironment {
   private readonly marker: Mesh;
   private readonly flag: Mesh;
   private time = 0;
+  public readonly dinghy: TrainingDinghy;
 
   public constructor(private readonly scene: Scene) {
     this.root = new TransformNode("shore-environment", scene);
@@ -109,24 +111,15 @@ export class ShoreEnvironment {
       this.cylinder("pier-post", 2.2, 0.23, [x, -0.5, z], wood);
     }
     this.label("УЧЕБНЫЙ ПИРС", new Vector3(-14, 2.8, -12), 5, 0.8);
-    const hull = this.box("training-dinghy", [2.6, 0.6, 4.5], [-9.5, 0.1, -26], white);
-    const bow = MeshBuilder.CreateCylinder("dinghy-bow", { height: 0.6, diameter: 2.6, tessellation: 3 }, scene);
-    bow.position.set(-9.5, 0.1, -28);
-    bow.material = white;
-    bow.parent = this.root;
-    this.cylinder("dinghy-mast", 6, 0.08, [-9.5, 3.1, -26], metal);
-    const sail = MeshBuilder.CreateCylinder("training-sail", { height: 0.025, diameter: 5, tessellation: 3 }, scene);
-    sail.rotation.z = Math.PI / 2;
-    sail.rotation.y = Math.PI / 2;
-    sail.scaling.set(0.85, 1, 1.2);
-    sail.position.set(-9.5, 3.35, -25.2);
-    sail.material = white;
-    sail.parent = this.root;
-    this.box("dinghy-boom", [0.08, 0.08, 3], [-9.5, 1.5, -24.8], wood);
+    this.dinghy = new TrainingDinghy(scene, this.root);
     const pierAnchor = new TransformNode("pier-inspection", scene);
     pierAnchor.parent = this.root;
     pierAnchor.position.set(-14, 0, -26);
-    this.stations.set("pier", { anchor: pierAnchor, meshes: [hull, sail] });
+    this.stations.set("pier", { anchor: pierAnchor, meshes: [...this.dinghy.parts.values()].flat() });
+    this.dinghy.onModelLoaded = () => {
+      const meshes = this.stations.get("pier")?.meshes;
+      if (meshes) meshes.splice(0, meshes.length, ...[...this.dinghy.parts.values()].flat());
+    };
     this.label("ОСМОТР ЛОДКИ · E", new Vector3(-10, 6.6, -26), 5, 0.8);
 
     // Sparse shoreline details and distant buoys keep the horizon readable.
@@ -160,10 +153,12 @@ export class ShoreEnvironment {
     this.time += Math.min(delta, 0.1);
     this.marker.rotation.y = this.time;
     this.marker.position.y = 3.5 + Math.sin(this.time * 2) * 0.18;
+    this.dinghy.update(delta);
     this.flag.rotation.y = Math.sin(this.time * 3) * 0.1;
   }
 
   public dispose(): void {
+    this.dinghy.dispose();
     this.root.dispose();
     this.textures.forEach((texture) => texture.dispose());
     this.materials.forEach((material) => material.dispose());

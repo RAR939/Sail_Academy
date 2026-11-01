@@ -1,4 +1,4 @@
-﻿import { Scene, StandardMaterial, Color3, MeshBuilder, Mesh } from "@babylonjs/core";
+import { Scene, StandardMaterial, Color3, MeshBuilder, Mesh } from "@babylonjs/core";
 import { CameraRig } from "../gameplay/CameraRig";
 import { InteractionSystem } from "../gameplay/InteractionSystem";
 import { Player } from "../gameplay/Player";
@@ -9,6 +9,7 @@ import type { PlayerStateMessage } from "../network/NetworkMessages";
 import { RemotePlayer } from "../network/RemotePlayer";
 import { ShoreApi, type ShoreStory } from "../network/ShoreApi";
 import { NpcChat } from "../ui/NpcChat";
+import { BoatLesson } from "../ui/BoatLesson";
 import { ShoreHud } from "../ui/ShoreHud";
 import { ShoreEnvironment, SHORE_NPCS } from "../world/ShoreEnvironment";
 import { Vector3 } from "@babylonjs/core";
@@ -20,6 +21,7 @@ export class HubScene {
   private readonly interactions: InteractionSystem;
   private readonly api = new ShoreApi();
   private readonly chat: NpcChat;
+  private readonly boatLesson: BoatLesson;
   private readonly hud = new ShoreHud();
   private readonly environment: ShoreEnvironment;
   private readonly assetLoader: AssetLoader;
@@ -38,6 +40,7 @@ export class HubScene {
 
   public constructor(private readonly scene: Scene, canvas: HTMLCanvasElement, private readonly network: NetworkClient) {
     this.environment = new ShoreEnvironment(scene);
+    this.boatLesson = new BoatLesson(scene, this.environment.dinghy);
     this.player = new Player(scene, { id: "local-player", spawn: new Vector3(0, 1.1, 0), runSpeed: 4 });
     this.cameraRig = new CameraRig(scene, canvas, {
       alpha: Math.PI / 2, beta: 0.85, radius: 12,
@@ -99,6 +102,10 @@ export class HubScene {
             if (this.disposed || !this.ready || version !== this.sessionVersion) return;
             this.applyStory(result.story);
             this.hud.toast(result.text);
+            if (id === "pier") {
+              this.input.setEnabled(false); this.cameraRig.setEnabled(false);
+              this.boatLesson.open(() => { this.input.setEnabled(this.ready); this.cameraRig.setEnabled(this.ready); if (this.ready) canvas.focus(); });
+            }
           } catch (error) {
             if (!this.disposed) this.hud.toast(error instanceof Error ? error.message : "Не удалось выполнить действие.");
           } finally { this.busy = false; }
@@ -120,6 +127,7 @@ export class HubScene {
           this.sessionVersion++;
           this.ready = false;
           this.chat.close();
+          this.boatLesson.close();
           this.input.setEnabled(false);
           this.cameraRig.setEnabled(false);
           this.hud.setVisible(false);
@@ -151,10 +159,10 @@ export class HubScene {
       this.player.setInput(input);
       this.player.update(delta);
       this.cameraRig.update(delta, input.moveX !== 0 || input.moveZ !== 0);
-      if (!this.chat.isOpen && !this.busy) this.interactions.update(this.player);
+      if (!this.chat.isOpen && !this.boatLesson.isOpen && !this.busy) this.interactions.update(this.player);
       const target = this.interactions.current;
       this.hint.textContent = target?.prompt ?? "";
-      this.hint.hidden = !target || this.chat.isOpen || this.busy;
+      this.hint.hidden = !target || this.chat.isOpen || this.boatLesson.isOpen || this.busy;
       this.hud.update(this.player.collider.position.x, this.player.collider.position.z);
       this.sendAccumulator += delta;
       if (this.sendAccumulator >= 1 / 15) {
@@ -228,6 +236,7 @@ export class HubScene {
     this.ready = false;
     this.unsubscribers.forEach((unsubscribe) => unsubscribe());
     this.chat.dispose();
+    this.boatLesson.dispose();
     this.hud.dispose();
     this.hint.remove();
     this.clearRemotePlayers();
