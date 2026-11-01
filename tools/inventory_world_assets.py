@@ -1,4 +1,4 @@
-﻿"""Inventory world asset files and GLB payloads; not a runtime memory budget."""
+"""Inventory world asset files and GLB payloads; not a runtime memory budget."""
 from __future__ import annotations
 
 import hashlib
@@ -43,7 +43,7 @@ def inspect_glb(data: bytes) -> dict:
 
 def inventory() -> dict:
     resources = []
-    for path in sorted([*ASSETS.rglob("*"), *SURFACES.rglob("*")]):
+    for path in sorted([*ASSETS.rglob("*"), *SURFACES.rglob("*")], key=lambda item: item.as_posix().casefold()):
         if not path.is_file() or path.suffix.lower() not in {".glb", ".png", ".jpg", ".jpeg", ".webp", ".ktx2"}:
             continue
         data = path.read_bytes()
