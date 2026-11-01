@@ -64,12 +64,18 @@ class GameLoop:
                 continue
 
             # Обновляем физику всех лодок комнаты.
-            for boat in room.boats.values():
+            for user_id, boat in room.boats.items():
+                if room.room_type != "race":
+                    continue
+                before = (boat.x, boat.z)
                 BoatPhysics.update(
                     boat,
                     self.wind,
                     delta_time
                 )
+                race = room.races.get(user_id)
+                if race:
+                    race.update(before, (boat.x, boat.z))
 
             # Формируем обновление состояния игроков.
             players_delta = []
@@ -92,6 +98,10 @@ class GameLoop:
                     "delta": players_delta
                 }
             )
+
+            if room.room_type == "race":
+                for user_id, race in room.races.items():
+                    await manager.send_personal(user_id, {"t": "race_state", **race.snapshot()})
 
             # Отдельно передаём актуальное состояние ветра.
             await manager.send_room(

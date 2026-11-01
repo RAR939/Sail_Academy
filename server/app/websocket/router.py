@@ -355,7 +355,7 @@ async def game_websocket(websocket: WebSocket):
                     })
                     continue
 
-                boat.heading = math.atan2(
+                boat.target_heading = math.atan2(
                     math.sin(heading),
                     math.cos(heading)
                 )

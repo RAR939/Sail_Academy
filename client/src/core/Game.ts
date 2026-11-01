@@ -4,6 +4,7 @@ import {
   Scene,
 } from "@babylonjs/core";
 import { HubScene } from "../scenes/HubScene";
+import { RaceScene } from "../scenes/RaceScene";
 import { DEFAULT_WORLD, fetchWorld, type WorldConfig, type WorldResponse } from "../world/WorldConfig";
 
 
@@ -27,6 +28,9 @@ export class Game {
   private readonly loginOverlay: NetworkLoginOverlay;
   private hasConnectedOnce = false;
   private unsubscribeNetworkStatus: (() => void) | null = null;
+  private readonly gameSubscriptions: Array<() => void> = [];
+  private raceScene: RaceScene | null = null;
+  private userId: number | null = null;
 
   public constructor(private readonly canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, {
@@ -47,6 +51,21 @@ export class Game {
     this.loginOverlay = new NetworkLoginOverlay(this.authenticate);
     this.loginOverlay.show();
 
+    this.gameSubscriptions.push(
+      this.network.on("welcome", (message) => { this.userId = message.user_id; }),
+      this.network.on("location_changed", (message) => {
+        if (message.roomType === "race" && this.userId !== null) {
+          this.raceScene?.dispose();
+          this.hubScene.setActive(false);
+          this.raceScene = new RaceScene(this.engine, this.canvas, this.network, this.userId);
+        } else if (message.roomType === "hub") {
+          this.raceScene?.dispose();
+          this.raceScene = null;
+          this.hubScene.setActive(true);
+        }
+      }),
+    );
+
 
     this.unsubscribeNetworkStatus = this.network.onStatus((status) => {
       if (status === "connected") {
@@ -56,6 +75,9 @@ export class Game {
       }
 
       if (status === "disconnected") {
+        this.raceScene?.dispose();
+        this.raceScene = null;
+        this.hubScene.setActive(true);
         this.adminButton.hidden = true;
         this.connection = null;
         if (this.hasConnectedOnce) this.loginOverlay.show();
@@ -67,8 +89,8 @@ export class Game {
     this.engine.runRenderLoop(() => {
       const deltaSeconds = this.engine.getDeltaTime() / 1000;
 
-      this.hubScene.update(deltaSeconds);
-      this.scene.render();
+      if (this.raceScene) this.raceScene.update(deltaSeconds);
+      else { this.hubScene.update(deltaSeconds); this.scene.render(); }
     });
 
     window.addEventListener("resize", this.resize);
@@ -80,6 +102,8 @@ export class Game {
     if (this.worldTimer !== null) window.clearInterval(this.worldTimer);
     this.adminButton.remove();
     this.unsubscribeNetworkStatus?.();
+    this.gameSubscriptions.forEach((unsubscribe) => unsubscribe());
+    this.raceScene?.dispose();
     this.loginOverlay.dispose();
     this.network.disconnect();
     this.hubScene.dispose();
@@ -91,6 +115,13 @@ private readonly authenticate = async (
   values: NetworkLoginValues
 ): Promise<void> => {
   const baseUrl = values.serverUrl.replace(/\/+$/, "");
+  const serverUrl = new URL(baseUrl);
+  if (!["http:", "https:"].includes(serverUrl.protocol)) {
+    throw new Error("Адрес сервера должен начинаться с http:// или https://");
+  }
+  if (window.location.protocol === "https:" && serverUrl.protocol !== "https:") {
+    throw new Error("Игра открыта по HTTPS. Укажите адрес сервера, начинающийся с https://");
+  }
 
   // Регистрация нового пользователя
   if (values.mode === "register") {
@@ -164,11 +195,11 @@ private readonly authenticate = async (
 
   private async refreshWorld(): Promise<void> {
     const connection = this.connection;
-    if (!connection || this.changingWorld || !this.network.isConnected || !this.hubScene.canApplyWorld) return;
+    if (!connection || this.raceScene || this.changingWorld || !this.network.isConnected || !this.hubScene.canApplyWorld) return;
     this.changingWorld = true;
     try {
       const published = await fetchWorld(connection.baseUrl);
-      if (this.connection !== connection || !this.network.isConnected || !this.hubScene.canApplyWorld) return;
+      if (this.connection !== connection || this.raceScene || !this.network.isConnected || !this.hubScene.canApplyWorld) return;
       if (published.revision !== this.revision) {
         this.replaceScene(published);
         await this.hubScene.enter(connection.baseUrl, connection.token, connection.skin);

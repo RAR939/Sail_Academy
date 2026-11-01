@@ -156,3 +156,9 @@ local_data/
 !pyproject.toml
 !uv.lock
 !requirements.txt
+
+# Project-local state
+.venv-*/
+server/certs/
+/shared/world/backups/
+/server/data/admins.json

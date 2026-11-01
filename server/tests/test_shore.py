@@ -102,6 +102,7 @@ def test_serves_built_client_and_local_models(game):
         response = client.get("/")
         assert response.status_code == 200
         assert 'id="renderCanvas"' in response.text
+        assert response.headers["cache-control"] == "no-cache"
         assert client.get("/assets/glb/environment/tree_palm_tall.glb").status_code == 200
         assert client.get("/seascape.png").status_code == 200
         assert client.get("/assets/glb/props/Textures/colormap.png").status_code == 200
